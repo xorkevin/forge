@@ -1,4 +1,4 @@
-package main
+package model
 
 const templateQueryGroupEq = `
 func {{.Prefix}}ModelGet{{.ModelIdent}}Eq{{.PrimaryField.Cond.Ident}}Ord{{.PrimaryField.Ident}}(db *sql.DB, key {{.PrimaryField.Cond.GoType}}, orderasc bool, limit, offset int) ([]{{.ModelIdent}}, error) {

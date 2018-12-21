@@ -1,4 +1,4 @@
-package main
+package model
 
 const templateQueryGroup = `
 func {{.Prefix}}ModelGet{{.ModelIdent}}Ord{{.PrimaryField.Ident}}(db *sql.DB, orderasc bool, limit, offset int) ([]{{.ModelIdent}}, error) {

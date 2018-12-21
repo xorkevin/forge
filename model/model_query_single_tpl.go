@@ -1,4 +1,4 @@
-package main
+package model
 
 const templateQuerySingle = `
 func {{.Prefix}}ModelGet{{.ModelIdent}}By{{.PrimaryField.Ident}}(db *sql.DB, key {{.PrimaryField.GoType}}) (*{{.ModelIdent}}, int, error) {
