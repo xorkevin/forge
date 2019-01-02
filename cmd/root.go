@@ -17,6 +17,7 @@ var RootCmd = &cobra.Command{
 	Short: "A code generation utility",
 	Long: `A code generation utility for governor to generate common files
 instead of writing them by hand.`,
+	Version: "v0.1.0",
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	//	Run: func(cmd *cobra.Command, args []string) { },
@@ -41,7 +42,7 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	RootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	//RootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
 // initConfig reads in config file and ENV variables if set.
