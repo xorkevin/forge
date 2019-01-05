@@ -51,6 +51,7 @@ type (
 		Ident  string
 		GoType string
 		DBName string
+		DBType string
 		Num    int
 		Mode   int
 		Cond   ModelField
@@ -337,13 +338,15 @@ func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([
 			log.Fatal("Field tag must be dbname,flag(optional),eqcond(optional)")
 		}
 		dbName := i.Tags[0]
-		if modelField, ok := seenFields[dbName]; !ok || i.GoType != modelField.GoType {
+		modelField, ok := seenFields[dbName]
+		if !ok || i.GoType != modelField.GoType {
 			log.Fatal("Field " + dbName + " with type " + i.GoType + " does not exist on model")
 		}
 		f := QueryField{
 			Ident:  i.Ident,
 			GoType: i.GoType,
 			DBName: dbName,
+			DBType: modelField.DBType,
 			Num:    n + 1,
 		}
 		fields = append(fields, f)
@@ -398,6 +401,10 @@ func parseFlag(flag string) int {
 	return -1
 }
 
+func dbTypeIsArray(dbType string) bool {
+	return strings.Contains(dbType, "ARRAY")
+}
+
 func (m *ModelDef) genModelSQL() ModelSQLStrings {
 	sqlDefs := make([]string, 0, len(m.Fields))
 	sqlDBNames := make([]string, 0, len(m.Fields))
@@ -409,8 +416,13 @@ func (m *ModelDef) genModelSQL() ModelSQLStrings {
 		sqlDefs = append(sqlDefs, fmt.Sprintf("%s %s", i.DBName, i.DBType))
 		sqlDBNames = append(sqlDBNames, i.DBName)
 		sqlPlaceholders = append(sqlPlaceholders, fmt.Sprintf("$%d", n+1))
-		sqlIdents = append(sqlIdents, fmt.Sprintf("m.%s", i.Ident))
-		sqlIdentRefs = append(sqlIdentRefs, fmt.Sprintf("&m.%s", i.Ident))
+		if dbTypeIsArray(i.DBType) {
+			sqlIdents = append(sqlIdents, fmt.Sprintf("pq.Array(m.%s)", i.Ident))
+			sqlIdentRefs = append(sqlIdentRefs, fmt.Sprintf("pq.Array(&m.%s)", i.Ident))
+		} else {
+			sqlIdents = append(sqlIdents, fmt.Sprintf("m.%s", i.Ident))
+			sqlIdentRefs = append(sqlIdentRefs, fmt.Sprintf("&m.%s", i.Ident))
+		}
 	}
 
 	return ModelSQLStrings{
@@ -422,28 +434,17 @@ func (m *ModelDef) genModelSQL() ModelSQLStrings {
 	}
 }
 
-func (m *ModelDef) genQuerySQL() QuerySQLStrings {
-	sqlDBNames := make([]string, 0, len(m.Fields))
-	sqlIdentRefs := make([]string, 0, len(m.Fields))
-
-	for _, i := range m.Fields {
-		sqlDBNames = append(sqlDBNames, i.DBName)
-		sqlIdentRefs = append(sqlIdentRefs, fmt.Sprintf("&m.%s", i.Ident))
-	}
-
-	return QuerySQLStrings{
-		DBNames:   strings.Join(sqlDBNames, ", "),
-		IdentRefs: strings.Join(sqlIdentRefs, ", "),
-	}
-}
-
 func (q *QueryDef) genQuerySQL() QuerySQLStrings {
 	sqlDBNames := make([]string, 0, len(q.Fields))
 	sqlIdentRefs := make([]string, 0, len(q.Fields))
 
 	for _, i := range q.Fields {
 		sqlDBNames = append(sqlDBNames, i.DBName)
-		sqlIdentRefs = append(sqlIdentRefs, fmt.Sprintf("&m.%s", i.Ident))
+		if dbTypeIsArray(i.DBType) {
+			sqlIdentRefs = append(sqlIdentRefs, fmt.Sprintf("pq.Array(&m.%s)", i.Ident))
+		} else {
+			sqlIdentRefs = append(sqlIdentRefs, fmt.Sprintf("&m.%s", i.Ident))
+		}
 	}
 
 	return QuerySQLStrings{
