@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"sort"
 	"strings"
 	"text/template"
 )
@@ -24,7 +25,7 @@ type (
 	ASTField struct {
 		Ident  string
 		GoType string
-		Tags   []string
+		Tags   string
 	}
 
 	ModelDef struct {
@@ -70,6 +71,7 @@ type (
 		Package    string
 		Prefix     string
 		TableName  string
+		Imports    string
 		ModelIdent string
 		PrimaryKey ModelField
 		SQL        ModelSQLStrings
@@ -108,7 +110,7 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 		fmt.Sprintf("Additional queries: %s", strings.Join(queryIdents, ", ")),
 	}, "; "))
 
-	modelDef, queryDefs := parseDefinitions(gofile, modelIdent, queryIdents)
+	modelDef, queryDefs, deps := parseDefinitions(gofile, modelIdent, queryIdents)
 
 	tplmodel, err := template.New("model").Parse(templateModel)
 	if err != nil {
@@ -130,6 +132,11 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 		log.Fatal(err)
 	}
 
+	tplquerygroupset, err := template.New("groupset").Parse(templateQueryGroupSet)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	genfile, err := os.OpenFile(generatedFilepath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
 	if err != nil {
 		log.Fatal(err)
@@ -142,6 +149,7 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 		Package:    gopackage,
 		Prefix:     prefix,
 		TableName:  tableName,
+		Imports:    deps,
 		ModelIdent: modelDef.Ident,
 		PrimaryKey: modelDef.PrimaryKey,
 		SQL:        modelDef.genModelSQL(),
@@ -186,6 +194,10 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 				if err := tplquerygroupeq.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
+			case flagGetGroupSet:
+				if err := tplquerygroupset.Execute(genFileWriter, tplData); err != nil {
+					log.Fatal(err)
+				}
 			}
 		}
 	}
@@ -195,7 +207,7 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 	fmt.Printf("Generated file: %s\n", generatedFilepath)
 }
 
-func parseDefinitions(gofile string, modelIdent string, queryIdents []string) (ModelDef, []QueryDef) {
+func parseDefinitions(gofile string, modelIdent string, queryIdents []string) (ModelDef, []QueryDef, string) {
 	fset := token.NewFileSet()
 	root, err := parser.ParseFile(fset, gofile, nil, parser.AllErrors)
 	if err != nil {
@@ -207,21 +219,23 @@ func parseDefinitions(gofile string, modelIdent string, queryIdents []string) (M
 
 	modelFields, primaryField, seenFields := parseModelFields(findFields(modelTagName, findStruct(modelIdent, root.Decls), fset))
 
+	deps := Dependencies{}
 	queryDefs := []QueryDef{}
 	for _, ident := range queryIdents {
-		fields, queries := parseQueryFields(findFields(queryTagName, findStruct(ident, root.Decls), fset), seenFields)
+		fields, queries, d := parseQueryFields(findFields(queryTagName, findStruct(ident, root.Decls), fset), seenFields)
 		queryDefs = append(queryDefs, QueryDef{
 			Ident:       ident,
 			Fields:      fields,
 			QueryFields: queries,
 		})
+		deps.Add(d)
 	}
 
 	return ModelDef{
 		Ident:      modelIdent,
 		Fields:     modelFields,
 		PrimaryKey: primaryField,
-	}, queryDefs
+	}, queryDefs, deps.String()
 }
 
 func findStruct(ident string, decls []ast.Decl) *ast.StructType {
@@ -260,7 +274,6 @@ func findFields(tagName string, modelDef *ast.StructType, fset *token.FileSet) [
 		if !ok {
 			continue
 		}
-		tags := strings.Split(tagVal, ",")
 
 		goType := bytes.Buffer{}
 		if err := printer.Fprint(&goType, fset, field.Type); err != nil {
@@ -274,7 +287,7 @@ func findFields(tagName string, modelDef *ast.StructType, fset *token.FileSet) [
 		m := ASTField{
 			Ident:  field.Names[0].Name,
 			GoType: goType.String(),
-			Tags:   tags,
+			Tags:   tagVal,
 		}
 		fields = append(fields, m)
 	}
@@ -289,11 +302,12 @@ func parseModelFields(astfields []ASTField) ([]ModelField, ModelField, map[strin
 
 	fields := []ModelField{}
 	for n, i := range astfields {
-		if len(i.Tags) != 2 {
+		tags := strings.Split(i.Tags, ",")
+		if len(tags) != 2 {
 			log.Fatal("Model field tag must be dbname,dbtype")
 		}
-		dbName := i.Tags[0]
-		dbType := i.Tags[1]
+		dbName := tags[0]
+		dbType := tags[1]
 		if len(dbName) == 0 {
 			log.Fatal(i.Ident + " dbname not set")
 		}
@@ -328,16 +342,18 @@ func parseModelFields(astfields []ASTField) ([]ModelField, ModelField, map[strin
 	return fields, primaryKey, seenFields
 }
 
-func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([]QueryField, []QueryField) {
+func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([]QueryField, []QueryField, string) {
 	hasQF := false
 	queryFields := []QueryField{}
+	deps := Dependencies{}
 
 	fields := []QueryField{}
 	for n, i := range astfields {
-		if len(i.Tags) < 1 || len(i.Tags) > 3 {
+		tags := strings.Split(i.Tags, ",")
+		if len(tags) < 1 || len(tags) > 3 {
 			log.Fatal("Field tag must be dbname,flag(optional),eqcond(optional)")
 		}
-		dbName := i.Tags[0]
+		dbName := tags[0]
 		modelField, ok := seenFields[dbName]
 		if !ok || i.GoType != modelField.GoType {
 			log.Fatal("Field " + dbName + " with type " + i.GoType + " does not exist on model")
@@ -350,25 +366,28 @@ func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([
 			Num:    n + 1,
 		}
 		fields = append(fields, f)
-		if len(i.Tags) > 1 {
+		if len(tags) > 1 {
 			hasQF = true
-			tagflag := parseFlag(i.Tags[1])
+			tagflag := parseFlag(tags[1])
 			f.Mode = tagflag
 			switch tagflag {
 			case flagGetGroupEq:
-				if len(i.Tags) != 3 {
+				if len(tags) != 3 {
 					log.Fatal("Field tag must be dbname,flag,eqcond for field " + i.Ident)
 				}
-				cond := i.Tags[2]
+				cond := tags[2]
 				if modelField, ok := seenFields[cond]; ok {
 					f.Cond = modelField
 				} else {
 					log.Fatal("Invalid eq condition field for field " + i.Ident)
 				}
 			default:
-				if len(i.Tags) != 2 {
+				if len(tags) != 2 {
 					log.Fatal("Field tag must be dbname,flag for field " + i.Ident)
 				}
+			}
+			if tagflag == flagGetGroupSet {
+				deps.Add(importsQueryGroupSet)
 			}
 			queryFields = append(queryFields, f)
 		}
@@ -378,13 +397,14 @@ func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([
 		log.Fatal("Query does not contain a query field")
 	}
 
-	return fields, queryFields
+	return fields, queryFields, deps.String()
 }
 
 const (
 	flagGet = iota
 	flagGetGroup
 	flagGetGroupEq
+	flagGetGroupSet
 )
 
 func parseFlag(flag string) int {
@@ -395,6 +415,8 @@ func parseFlag(flag string) int {
 		return flagGetGroup
 	case "getgroupeq":
 		return flagGetGroupEq
+	case "getgroupset":
+		return flagGetGroupSet
 	default:
 		log.Fatal("Illegal flag " + flag)
 	}
@@ -451,4 +473,26 @@ func (q *QueryDef) genQuerySQL() QuerySQLStrings {
 		DBNames:   strings.Join(sqlDBNames, ", "),
 		IdentRefs: strings.Join(sqlIdentRefs, ", "),
 	}
+}
+
+type (
+	Dependencies map[string]struct{}
+)
+
+func (d Dependencies) Add(deps string) {
+	for _, i := range strings.Fields(deps) {
+		d[i] = struct{}{}
+	}
+}
+
+func (d Dependencies) String() string {
+	if len(d) == 0 {
+		return ""
+	}
+	k := make([]string, 0, len(d))
+	for i := range d {
+		k = append(k, i)
+	}
+	sort.Strings(k)
+	return "\n" + strings.Join(k, "\n") + "\n"
 }

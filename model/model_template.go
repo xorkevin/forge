@@ -5,7 +5,7 @@ package {{.Package}}
 
 import (
 	"database/sql"
-	"github.com/lib/pq"
+	"github.com/lib/pq"{{.Imports}}
 )
 
 const (
