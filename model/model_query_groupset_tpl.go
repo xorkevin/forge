@@ -15,7 +15,7 @@ func {{.Prefix}}ModelGet{{.ModelIdent}}Set{{.PrimaryField.Ident}}(db *sql.DB, ke
 		args = append(args, i)
 	}
 
-	stmt := fmt.Sprintf("SELECT {{.SQL.DBNames}} FROM {{.TableName}} WHERE {{.PrimaryField.DBName}} IN (VALUES %s);" , strings.Join(placeholders, ","))
+	stmt := "SELECT {{.SQL.DBNames}} FROM {{.TableName}} WHERE {{.PrimaryField.DBName}} IN (VALUES " + strings.Join(placeholders, ",") + ");"
 
 	res := make([]{{.ModelIdent}}, 0, len(keys))
 	rows, err := db.Query(stmt, args...)
