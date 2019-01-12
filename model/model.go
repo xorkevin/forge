@@ -349,11 +349,11 @@ func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([
 
 	fields := []QueryField{}
 	for n, i := range astfields {
-		tags := strings.Split(i.Tags, ",")
-		if len(tags) < 1 || len(tags) > 3 {
-			log.Fatal("Field tag must be dbname,flag(optional),eqcond(optional)")
+		props := strings.SplitN(i.Tags, ",", 2)
+		if len(props) < 1 {
+			log.Fatal("Field tag must be dbname,flag(optional),args(optional)[;...]")
 		}
-		dbName := tags[0]
+		dbName := props[0]
 		modelField, ok := seenFields[dbName]
 		if !ok || i.GoType != modelField.GoType {
 			log.Fatal("Field " + dbName + " with type " + i.GoType + " does not exist on model")
@@ -366,30 +366,33 @@ func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([
 			Num:    n + 1,
 		}
 		fields = append(fields, f)
-		if len(tags) > 1 {
+		if len(props) > 1 {
 			hasQF = true
-			tagflag := parseFlag(tags[1])
-			f.Mode = tagflag
-			switch tagflag {
-			case flagGetGroupEq:
-				if len(tags) != 3 {
-					log.Fatal("Field tag must be dbname,flag,eqcond for field " + i.Ident)
+			for _, t := range strings.Split(props[1], ";") {
+				tags := strings.Split(t, ",")
+				tagflag := parseFlag(tags[0])
+				f.Mode = tagflag
+				switch tagflag {
+				case flagGetGroupEq:
+					if len(tags) != 2 {
+						log.Fatal("Field tag must be dbname,flag,eqcond for field " + i.Ident)
+					}
+					cond := tags[1]
+					if modelField, ok := seenFields[cond]; ok {
+						f.Cond = modelField
+					} else {
+						log.Fatal("Invalid eq condition field for field " + i.Ident)
+					}
+				default:
+					if len(tags) != 1 {
+						log.Fatal("Field tag must be dbname,flag for field " + i.Ident)
+					}
 				}
-				cond := tags[2]
-				if modelField, ok := seenFields[cond]; ok {
-					f.Cond = modelField
-				} else {
-					log.Fatal("Invalid eq condition field for field " + i.Ident)
+				if tagflag == flagGetGroupSet {
+					deps.Add(importsQueryGroupSet)
 				}
-			default:
-				if len(tags) != 2 {
-					log.Fatal("Field tag must be dbname,flag for field " + i.Ident)
-				}
+				queryFields = append(queryFields, f)
 			}
-			if tagflag == flagGetGroupSet {
-				deps.Add(importsQueryGroupSet)
-			}
-			queryFields = append(queryFields, f)
 		}
 	}
 
