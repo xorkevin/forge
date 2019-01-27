@@ -13,7 +13,7 @@ const (
 )
 
 func {{.Prefix}}ModelSetup(db *sql.DB) error {
-	_, err := db.Exec("CREATE TABLE {{.TableName}} ({{.SQL.Setup}});")
+	_, err := db.Exec("CREATE TABLE IF NOT EXISTS {{.TableName}} ({{.SQL.Setup}});")
 	return err
 }
 
