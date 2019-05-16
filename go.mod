@@ -1,6 +1,7 @@
 module github.com/hackform/forge
 
 require (
+	github.com/cpuguy83/go-md2man v1.0.10 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/magiconair/properties v1.8.1 // indirect
