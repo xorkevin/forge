@@ -64,7 +64,7 @@ func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose b
 				}
 				return nil
 			}
-			if !info.IsDir() {
+			if info.Mode().IsRegular() {
 				filepathSet.add(path)
 			}
 			return nil
