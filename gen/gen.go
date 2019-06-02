@@ -25,7 +25,7 @@ func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose b
 		ip, err := generateIgnorePathSet()
 		if err != nil {
 			if verbose {
-				fmt.Println(err)
+				fmt.Printf("git ls-files error: %s\n", err)
 			}
 		} else {
 			ignorePaths = ip
