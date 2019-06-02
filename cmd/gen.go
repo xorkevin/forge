@@ -6,8 +6,9 @@ import (
 )
 
 var (
-	genNoIgnore bool
 	genPrefix   string
+	genSuffix   string
+	genNoIgnore bool
 	genDryRun   bool
 	genVerbose  bool
 )
@@ -20,9 +21,11 @@ var genCmd = &cobra.Command{
 
 Directives appear in the form of:
 
-	<prefix>forge:gen command args`,
+	<prefix>forge:gen command args [<suffix> | '\n']
+
+forge gen directives end on the first new line or suffix`,
 	Run: func(cmd *cobra.Command, args []string) {
-		gen.Execute(genNoIgnore, genPrefix, genDryRun, genVerbose, args)
+		gen.Execute(genPrefix, genSuffix, genNoIgnore, genDryRun, genVerbose, args)
 	},
 }
 
@@ -36,6 +39,7 @@ func init() {
 	// genCmd.PersistentFlags().String("foo", "", "A help for foo")
 	genCmd.PersistentFlags().BoolVarP(&genNoIgnore, "noignore", "i", false, "do not use .gitignore")
 	genCmd.PersistentFlags().StringVarP(&genPrefix, "prefix", "p", "+", "set prefix for forge directive")
+	genCmd.PersistentFlags().StringVarP(&genPrefix, "suffix", "s", "+gen:end", "set suffix for forge directive")
 	genCmd.PersistentFlags().BoolVarP(&genDryRun, "dryrun", "n", false, "do not exec directives but print what would be executed")
 	genCmd.PersistentFlags().BoolVarP(&genVerbose, "verbose", "v", false, "increase the verbosity of the output")
 
