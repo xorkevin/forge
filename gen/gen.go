@@ -1,12 +1,15 @@
 package gen
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
+	"sync"
 )
 
 const (
@@ -72,11 +75,103 @@ func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose b
 			log.Fatalf("failed reading file: %s", err.Error())
 		}
 	}
+
+	files := make(chan string)
+	jobs := make(chan string)
+	parserWg := sync.WaitGroup{}
+	executorWg := sync.WaitGroup{}
+	for i := 0; i < 1; i++ {
+		parserWg.Add(1)
+		go fileParser(files, jobs, &parserWg, prefix, suffix, verbose)
+		executorWg.Add(1)
+		go jobExecutor(jobs, &executorWg, dryRun, verbose)
+	}
 	for _, i := range filepathSet.list {
+		files <- i
+	}
+	close(files)
+	parserWg.Wait()
+	close(jobs)
+	executorWg.Wait()
+}
+
+func fileParser(files <-chan string, jobs chan<- string, wg *sync.WaitGroup, prefix, suffix string, verbose bool) {
+	defer wg.Done()
+	for {
+		filename, ok := <-files
+		if !ok {
+			return
+		}
 		if verbose {
-			fmt.Printf("parsing: %s\n", i)
+			fmt.Printf("parsing: %s\n", filename)
+		}
+		directives, err := parseFile(filename, prefix, suffix)
+		if err != nil {
+			fmt.Printf("failed reading file %s: %s\n", filename, err)
+			continue
+		}
+		for _, i := range directives {
+			jobs <- i
 		}
 	}
+}
+
+func parseFile(filename string, prefix, suffix string) ([]string, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	directives := []string{}
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		directive, ok := parseLine(scanner.Text(), prefix, suffix)
+		if ok {
+			directives = append(directives, directive)
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return directives, nil
+}
+
+func parseLine(line string, prefix, suffix string) (string, bool) {
+	prefixLoc := strings.Index(line, prefix)
+	if prefixLoc < 0 {
+		return "", false
+	}
+	commandLoc := prefixLoc + len(prefix)
+	directive := ""
+	suffixLoc := strings.Index(line, suffix)
+	if suffixLoc > commandLoc {
+		directive = line[commandLoc:suffixLoc]
+	} else {
+		directive = line[commandLoc:]
+	}
+	return strings.TrimSpace(directive), true
+}
+
+func jobExecutor(jobs <-chan string, wg *sync.WaitGroup, dryRun bool, verbose bool) {
+	defer wg.Done()
+	for {
+		job, ok := <-jobs
+		if !ok {
+			return
+		}
+		fmt.Printf("executing: %s", job)
+		if !dryRun {
+			executeJob(job)
+		}
+	}
+}
+
+func executeJob(job string) {
 }
 
 func generateIgnorePathSet() (*pathSet, error) {

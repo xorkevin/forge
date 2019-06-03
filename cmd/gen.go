@@ -21,7 +21,7 @@ var genCmd = &cobra.Command{
 
 Directives appear in the form of:
 
-	<prefix>forge:gen command args [<suffix> | '\n']
+	<prefix>command args[<suffix>|'\n'|EOF]
 
 forge gen directives end on the first new line or suffix`,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -38,7 +38,7 @@ func init() {
 	// and all subcommands, e.g.:
 	// genCmd.PersistentFlags().String("foo", "", "A help for foo")
 	genCmd.PersistentFlags().BoolVarP(&genNoIgnore, "noignore", "i", false, "do not use .gitignore")
-	genCmd.PersistentFlags().StringVarP(&genPrefix, "prefix", "p", "+", "set prefix for forge directive")
+	genCmd.PersistentFlags().StringVarP(&genPrefix, "prefix", "p", "+forge:gen", "set prefix for forge directive")
 	genCmd.PersistentFlags().StringVarP(&genPrefix, "suffix", "s", "+gen:end", "set suffix for forge directive")
 	genCmd.PersistentFlags().BoolVarP(&genDryRun, "dryrun", "n", false, "do not exec directives but print what would be executed")
 	genCmd.PersistentFlags().BoolVarP(&genVerbose, "verbose", "v", false, "increase the verbosity of the output")
