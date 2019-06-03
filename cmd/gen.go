@@ -39,7 +39,7 @@ func init() {
 	// genCmd.PersistentFlags().String("foo", "", "A help for foo")
 	genCmd.PersistentFlags().BoolVarP(&genNoIgnore, "noignore", "i", false, "do not use .gitignore")
 	genCmd.PersistentFlags().StringVarP(&genPrefix, "prefix", "p", "+forge:gen", "set prefix for forge directive")
-	genCmd.PersistentFlags().StringVarP(&genPrefix, "suffix", "s", "+gen:end", "set suffix for forge directive")
+	genCmd.PersistentFlags().StringVarP(&genSuffix, "suffix", "s", "+gen:end", "set suffix for forge directive")
 	genCmd.PersistentFlags().BoolVarP(&genDryRun, "dryrun", "n", false, "do not exec directives but print what would be executed")
 	genCmd.PersistentFlags().BoolVarP(&genVerbose, "verbose", "v", false, "increase the verbosity of the output")
 

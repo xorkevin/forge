@@ -18,6 +18,10 @@ const (
 )
 
 func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose bool, args []string) {
+	if verbose {
+		fmt.Printf("prefix: %s; suffix: %s; dry-run: %t\n", prefix, suffix, dryRun)
+	}
+
 	paths := []string{"."}
 	if len(args) > 0 {
 		paths = args
@@ -84,7 +88,7 @@ func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose b
 		parserWg.Add(1)
 		go fileParser(files, jobs, &parserWg, prefix, suffix, verbose)
 		executorWg.Add(1)
-		go jobExecutor(jobs, &executorWg, dryRun, verbose)
+		go jobExecutor(jobs, &executorWg, dryRun)
 	}
 	for _, i := range filepathSet.list {
 		files <- i
@@ -157,14 +161,14 @@ func parseLine(line string, prefix, suffix string) (string, bool) {
 	return strings.TrimSpace(directive), true
 }
 
-func jobExecutor(jobs <-chan string, wg *sync.WaitGroup, dryRun bool, verbose bool) {
+func jobExecutor(jobs <-chan string, wg *sync.WaitGroup, dryRun bool) {
 	defer wg.Done()
 	for {
 		job, ok := <-jobs
 		if !ok {
 			return
 		}
-		fmt.Printf("executing: %s", job)
+		fmt.Printf("exec: %s\n", job)
 		if !dryRun {
 			executeJob(job)
 		}
