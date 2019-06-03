@@ -23,7 +23,17 @@ Directives appear in the form of:
 
 	<prefix>command args[<suffix>|'\n'|EOF]
 
-forge gen directives end on the first new line or suffix`,
+forge gen directives end on the first new line or suffix
+
+Arguments may also be replaced by environment variables:
+
+file.txt:
+	+forge:gen echo $TEST ${TEST} ${BOGUS:-default val} "$TEST ${TEST}" '$TEST ${TEST}' +gen:end
+
+output:
+	$ TEST=test forge gen
+	test test default val test test $TEST ${TEST}
+`,
 	Run: func(cmd *cobra.Command, args []string) {
 		gen.Execute(genPrefix, genSuffix, genNoIgnore, genDryRun, genVerbose, args)
 	},
