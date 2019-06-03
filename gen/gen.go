@@ -180,6 +180,7 @@ func parseArgs(directive string, filepath, filename string, lineno int) ([]strin
 		replace := true
 		strmode := false
 		doublequote := true
+		bracemode := false
 
 		switch text[0] {
 		case '\'':
@@ -188,6 +189,10 @@ func parseArgs(directive string, filepath, filename string, lineno int) ([]strin
 			doublequote = false
 		case '"':
 			strmode = true
+		case '$':
+			if len(text) > 1 && text[1] == '{' {
+				bracemode = true
+			}
 		}
 
 		var arg string
@@ -212,10 +217,32 @@ func parseArgs(directive string, filepath, filename string, lineno int) ([]strin
 						arg = text[1:i]
 					}
 					text = text[k:]
+					break
 				}
 			}
 			if !found {
 				return nil, errors.New("unclosed quote")
+			}
+		} else if bracemode {
+			found := false
+			for i := 2; i < len(text); i++ {
+				ch := text[i]
+				if ch == '}' {
+					found = true
+					k := i + 1
+					a := text[0:k]
+					text = text[k:]
+					k = strings.IndexAny(text, " \t")
+					if k < 0 {
+						k = len(text)
+					}
+					arg = a + text[0:k]
+					text = text[k:]
+					break
+				}
+			}
+			if !found {
+				return nil, errors.New("unclosed brace")
 			}
 		} else {
 			k := strings.IndexAny(text, " \t")
