@@ -12,14 +12,48 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 const (
-	gitFilename       = ".git"
-	gitignoreFilename = ".gitignore"
-	envforgepath      = "FORGEPATH"
-	envforgefile      = "FORGEFILE"
-	envforgeline      = "FORGELINE"
+	envforgepath = "FORGEPATH"
+	envforgefile = "FORGEFILE"
+	envforgeline = "FORGELINE"
+)
+
+var (
+	noTrackDirnames  *stringSet
+	noTrackFilenames *stringSet
+)
+
+func init() {
+	dirnames := []string{
+		".git",
+	}
+	noTrackDirnames = newStringSet(len(dirnames))
+	for _, i := range dirnames {
+		noTrackDirnames.add(i)
+	}
+}
+
+func init() {
+	filenames := []string{
+		".gitignore",
+		".gitmodules",
+	}
+	noTrackFilenames = newStringSet(len(filenames))
+	for _, i := range filenames {
+		noTrackFilenames.add(i)
+	}
+}
+
+var (
+	errNotUTF8        = errors.New("not a utf8 file")
+	errStringMisquote = errors.New("misquoted string")
+	errUnclosedString = errors.New("unclosed string")
+	errUnclosedBrace  = errors.New("unclosed brace")
+	errInvalidEnvVar  = errors.New("invalid env var name")
+	errNoPrefix       = errors.New("no prefix")
 )
 
 func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose bool, args []string) {
@@ -38,7 +72,7 @@ func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose b
 		paths = args
 	}
 
-	ignorePaths := newPathSet(0)
+	ignorePaths := newStringSet(0)
 	if !noIgnore {
 		ip, err := generateIgnorePathSet()
 		if err != nil {
@@ -57,19 +91,23 @@ func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose b
 		}
 	}
 
-	filepathSet := newPathSet(0)
+	filepathSet := newStringSet(0)
 	for _, i := range paths {
 		if err := filepath.Walk(i, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
 
-			// do not track .git or .gitignore files
-			if filename := info.Name(); filename == gitFilename || filename == gitignoreFilename {
-				if info.IsDir() {
+			// do not track blacklisted dirs and files
+			filename := info.Name()
+			if info.IsDir() {
+				if noTrackDirnames.has(filename) {
 					return filepath.SkipDir
 				}
-				return nil
+			} else {
+				if noTrackFilenames.has(filename) {
+					return nil
+				}
 			}
 
 			// do not track ignored files
@@ -97,7 +135,13 @@ func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose b
 		}
 		directives, filename, err := parseFile(filepath, prefix, suffix)
 		if err != nil {
-			fmt.Printf("failed reading file %s: %s\n", filepath, err)
+			if err == errNotUTF8 {
+				if verbose {
+					fmt.Printf("ignoring %s: not a utf8 file\n", filepath)
+				}
+				continue
+			}
+			fmt.Printf("failed parsing file %s: %s\n", filepath, err)
 			continue
 		}
 
@@ -136,9 +180,16 @@ func parseFile(filepath string, prefix, suffix string) ([]directive, string, err
 	directives := []directive{}
 	scanner := bufio.NewScanner(file)
 	for i := 0; scanner.Scan(); i++ {
-		args, text, ok := parseLine(scanner.Text(), prefix, suffix, filepath, filename, i)
-		if !ok {
-			continue
+		text := scanner.Text()
+		if !utf8.ValidString(text) {
+			return nil, "", errNotUTF8
+		}
+		args, text, err := parseLine(text, prefix, suffix, filepath, filename, i)
+		if err != nil {
+			if err == errNoPrefix {
+				continue
+			}
+			return nil, "", fmt.Errorf("line %d: %s", i, err)
 		}
 		directives = append(directives, directive{
 			line: i,
@@ -152,10 +203,10 @@ func parseFile(filepath string, prefix, suffix string) ([]directive, string, err
 	return directives, filename, nil
 }
 
-func parseLine(line string, prefix, suffix string, filepath, filename string, lineno int) ([]string, string, bool) {
+func parseLine(line string, prefix, suffix string, filepath, filename string, lineno int) ([]string, string, error) {
 	prefixLoc := strings.Index(line, prefix)
 	if prefixLoc < 0 {
-		return nil, "", false
+		return nil, "", errNoPrefix
 	}
 	commandLoc := prefixLoc + len(prefix)
 	directive := ""
@@ -168,10 +219,9 @@ func parseLine(line string, prefix, suffix string, filepath, filename string, li
 	directive = strings.TrimSpace(directive)
 	args, err := parseArgs(directive, filename, filepath, lineno)
 	if err != nil {
-		fmt.Printf("failed parsing %s line %d: %s\n", filepath, lineno, err)
-		return nil, "", false
+		return nil, "", err
 	}
-	return args, directive, true
+	return args, directive, nil
 }
 
 func parseArgs(directive string, filepath, filename string, lineno int) ([]string, error) {
@@ -205,7 +255,7 @@ func parseArgs(directive string, filepath, filename string, lineno int) ([]strin
 					if doublequote {
 						a, err := strconv.Unquote(text[0:k])
 						if err != nil {
-							return nil, errors.New("misquoted string")
+							return nil, errStringMisquote
 						}
 						arg = a
 					} else {
@@ -216,7 +266,7 @@ func parseArgs(directive string, filepath, filename string, lineno int) ([]strin
 				}
 			}
 			if !found {
-				return nil, errors.New("unclosed quote")
+				return nil, errUnclosedString
 			}
 		} else {
 			k := strings.IndexAny(text, " \t")
@@ -228,7 +278,7 @@ func parseArgs(directive string, filepath, filename string, lineno int) ([]strin
 			if strings.Contains(arg, "${") {
 				i := strings.IndexAny(text, "}")
 				if i < 0 {
-					return nil, errors.New("unclosed brace")
+					return nil, errUnclosedBrace
 				}
 				k = i + 1
 				arg += text[0:k]
@@ -286,7 +336,7 @@ func replaceEnvVar(arg string, filepath, filename string, lineno int) (string, e
 			text = text[1:]
 			end := strings.IndexAny(text, "}")
 			if end < 0 {
-				return "", errors.New("unclosed brace")
+				return "", errUnclosedBrace
 			}
 			envpair := strings.SplitN(text[0:end], envvardefaultSeparator, 2)
 			envvar = envpair[0]
@@ -299,7 +349,7 @@ func replaceEnvVar(arg string, filepath, filename string, lineno int) (string, e
 			continue
 		}
 		if !regexAlphanum.MatchString(envvar) {
-			return "", errors.New("invalid env var name")
+			return "", errInvalidEnvVar
 		}
 
 		s.WriteString(lookupEnv(envvar, envvaldefault, filepath, filename, lineno))
@@ -332,12 +382,12 @@ func executeJob(args []string, env []string) error {
 	return cmd.Run()
 }
 
-func generateIgnorePathSet() (*pathSet, error) {
+func generateIgnorePathSet() (*stringSet, error) {
 	cmd := exec.Command("git", "ls-files", "-oi", "--directory", "--exclude-standard")
 	out := bytes.Buffer{}
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
-		return newPathSet(0), err
+		return newStringSet(0), err
 	}
 	ignorePathBytes := bytes.Split(bytes.Trim(out.Bytes(), "\n"), []byte{'\n'})
 
@@ -345,11 +395,11 @@ func generateIgnorePathSet() (*pathSet, error) {
 	out = bytes.Buffer{}
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
-		return newPathSet(0), err
+		return newStringSet(0), err
 	}
 	submodulePathBytes := bytes.Split(bytes.Trim(out.Bytes(), "\n"), []byte{'\n'})
 
-	ignorePaths := newPathSet(len(ignorePathBytes))
+	ignorePaths := newStringSet(len(ignorePathBytes))
 	for _, i := range ignorePathBytes {
 		k := string(i)
 		if len(k) == 0 {
@@ -370,20 +420,20 @@ func generateIgnorePathSet() (*pathSet, error) {
 }
 
 type (
-	pathSet struct {
+	stringSet struct {
 		set  map[string]struct{}
 		list []string
 	}
 )
 
-func newPathSet(size int) *pathSet {
-	return &pathSet{
+func newStringSet(size int) *stringSet {
+	return &stringSet{
 		set:  make(map[string]struct{}, size),
 		list: make([]string, 0, size),
 	}
 }
 
-func (ps *pathSet) add(path string) bool {
+func (ps *stringSet) add(path string) bool {
 	if ps.has(path) {
 		return false
 	}
@@ -392,7 +442,7 @@ func (ps *pathSet) add(path string) bool {
 	return true
 }
 
-func (ps pathSet) has(path string) bool {
+func (ps stringSet) has(path string) bool {
 	_, ok := ps.set[path]
 	return ok
 }
