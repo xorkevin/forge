@@ -340,9 +340,30 @@ func generateIgnorePathSet() (*pathSet, error) {
 		return newPathSet(0), err
 	}
 	ignorePathBytes := bytes.Split(bytes.Trim(out.Bytes(), "\n"), []byte{'\n'})
+
+	cmd = exec.Command("git", "submodule", "-q", "foreach", "--recursive", "echo $displaypath")
+	out = bytes.Buffer{}
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		return newPathSet(0), err
+	}
+	submodulePathBytes := bytes.Split(bytes.Trim(out.Bytes(), "\n"), []byte{'\n'})
+
 	ignorePaths := newPathSet(len(ignorePathBytes))
 	for _, i := range ignorePathBytes {
-		k := filepath.Clean(string(i))
+		k := string(i)
+		if len(k) == 0 {
+			continue
+		}
+		k = filepath.Clean(string(i))
+		ignorePaths.add(k)
+	}
+	for _, i := range submodulePathBytes {
+		k := string(i)
+		if len(k) == 0 {
+			continue
+		}
+		k = filepath.Clean(string(i))
 		ignorePaths.add(k)
 	}
 	return ignorePaths, nil
