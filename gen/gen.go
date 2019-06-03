@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -222,15 +223,85 @@ func parseArgs(directive string, filepath, filename string, lineno int) ([]strin
 		}
 
 		if replace {
-			arg = replaceEnvVar(arg, filepath, filename, lineno)
+			a, err := replaceEnvVar(arg, filepath, filename, lineno)
+			if err != nil {
+				return nil, err
+			}
+			arg = a
 		}
 		args = append(args, arg)
 	}
 	return args, nil
 }
 
-func replaceEnvVar(arg string, filepath, filename string, lineno int) string {
-	return arg
+const (
+	envvardefaultSeparator = ":-"
+)
+
+var (
+	regexAlphanum = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]*$")
+)
+
+func replaceEnvVar(arg string, filepath, filename string, lineno int) (string, error) {
+	s := strings.Builder{}
+	for text := arg; len(text) > 0; {
+		k := strings.IndexAny(text, "$")
+		if k < 0 || k+1 >= len(text) {
+			s.WriteString(text)
+			break
+		}
+		s.WriteString(text[0:k])
+		text = text[k+1:]
+
+		envvar := ""
+		envvaldefault := ""
+		if regexAlphanum.MatchString(string(text[0])) {
+			end := strings.IndexAny(text, " \t")
+			if end < 0 {
+				end = len(text)
+			}
+			envvar = text[0:end]
+			text = text[end:]
+		} else if text[0] == '{' {
+			text = text[1:]
+			end := strings.IndexAny(text, "}")
+			if end < 0 {
+				return "", errors.New("unclosed brace")
+			}
+			envpair := strings.SplitN(text[0:end], envvardefaultSeparator, 2)
+			envvar = envpair[0]
+			if len(envpair) > 1 {
+				envvaldefault = envpair[1]
+			}
+			text = text[end+1:]
+		} else {
+			s.WriteString("$")
+			continue
+		}
+		if !regexAlphanum.MatchString(envvar) {
+			return "", errors.New("invalid env var name")
+		}
+
+		s.WriteString(lookupEnv(envvar, envvaldefault, filepath, filename, lineno))
+	}
+	return s.String(), nil
+}
+
+func lookupEnv(envvar string, envvaldefault string, filepath, filename string, lineno int) string {
+	switch envvar {
+	case envforgepath:
+		return filepath
+	case envforgefile:
+		return filename
+	case envforgeline:
+		return strconv.Itoa(lineno)
+	default:
+		if val, ok := os.LookupEnv(envvar); ok {
+			return val
+		} else {
+			return envvaldefault
+		}
+	}
 }
 
 func executeJob(args []string, env []string) error {
