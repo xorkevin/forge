@@ -33,6 +33,11 @@ file.txt:
 output:
 	$ TEST=test forge gen
 	test test default val test test $TEST ${TEST}
+
+By default the files that git ignores will be ignored and git submodules will
+be ignored as well. This behavior may be changed with -i, --noignore.
+
+A dry run of the commands will be shown with the -n flag.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		gen.Execute(genPrefix, genSuffix, genNoIgnore, genDryRun, genVerbose, args)
