@@ -3,6 +3,7 @@ package gen
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -15,6 +16,9 @@ import (
 const (
 	gitFilename       = ".git"
 	gitignoreFilename = ".gitignore"
+	envforgepath      = "FORGEPATH"
+	envforgefile      = "FORGEFILE"
+	envforgeline      = "FORGELINE"
 )
 
 func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose bool, args []string) {
@@ -86,21 +90,21 @@ func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose b
 		}
 	}
 
-	for _, filename := range filepathSet.list {
+	for _, filepath := range filepathSet.list {
 		if verbose {
-			fmt.Printf("parsing: %s\n", filename)
+			fmt.Printf("parsing: %s\n", filepath)
 		}
-		directives, err := parseFile(filename, prefix, suffix)
+		directives, filename, err := parseFile(filepath, prefix, suffix)
 		if err != nil {
-			fmt.Printf("failed reading file %s: %s\n", filename, err)
+			fmt.Printf("failed reading file %s: %s\n", filepath, err)
 			continue
 		}
 
-		fileenv := append(environ, "FORGEFILE="+filename)
+		fileenv := append(environ, envforgepath+"="+filepath, envforgefile+"="+filename)
 		for _, i := range directives {
-			fmt.Printf("forge exec: %s line %d: %s\n", filename, i.line, i.text)
+			fmt.Printf("forge exec: %s line %d: %s\n", filepath, i.line, i.text)
 			if !dryRun {
-				if err := executeJob(i.job, append(fileenv, "FORGELINE="+strconv.Itoa(i.line))); err != nil {
+				if err := executeJob(i.args, append(fileenv, envforgeline+"="+strconv.Itoa(i.line))); err != nil {
 					fmt.Printf("failed: %s", err)
 				}
 			}
@@ -111,41 +115,43 @@ func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose b
 type (
 	directive struct {
 		line int
-		job  []string
+		args []string
 		text string
 	}
 )
 
-func parseFile(filename string, prefix, suffix string) ([]directive, error) {
-	file, err := os.Open(filename)
+func parseFile(filepath string, prefix, suffix string) ([]directive, string, error) {
+	file, err := os.Open(filepath)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
 			log.Fatal(err)
 		}
 	}()
+	filename := file.Name()
 
 	directives := []directive{}
 	scanner := bufio.NewScanner(file)
 	for i := 0; scanner.Scan(); i++ {
-		job, text, ok := parseLine(scanner.Text(), prefix, suffix)
-		if ok {
-			directives = append(directives, directive{
-				line: i,
-				job:  job,
-				text: text,
-			})
+		args, text, ok := parseLine(scanner.Text(), prefix, suffix, filepath, filename, i)
+		if !ok {
+			continue
 		}
+		directives = append(directives, directive{
+			line: i,
+			args: args,
+			text: text,
+		})
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return directives, nil
+	return directives, filename, nil
 }
 
-func parseLine(line string, prefix, suffix string) ([]string, string, bool) {
+func parseLine(line string, prefix, suffix string, filepath, filename string, lineno int) ([]string, string, bool) {
 	prefixLoc := strings.Index(line, prefix)
 	if prefixLoc < 0 {
 		return nil, "", false
@@ -159,11 +165,76 @@ func parseLine(line string, prefix, suffix string) ([]string, string, bool) {
 		directive = line[commandLoc:]
 	}
 	directive = strings.TrimSpace(directive)
-	return strings.Fields(directive), directive, true
+	args, err := parseArgs(directive, filename, filepath, lineno)
+	if err != nil {
+		fmt.Println(err)
+		return nil, "", false
+	}
+	return args, directive, true
 }
 
-func executeJob(job []string, env []string) error {
-	cmd := exec.Command(job[0], job[1:]...)
+func parseArgs(directive string, filepath, filename string, lineno int) ([]string, error) {
+	args := []string{}
+	for text := directive; len(text) > 0; text = strings.TrimLeft(text, " \t") {
+		replace := true
+		strmode := false
+		stringchar := byte('"')
+
+		switch text[0] {
+		case '\'':
+			replace = false
+			strmode = true
+			stringchar = byte('\'')
+		case '"':
+			strmode = true
+		}
+
+		var arg string
+		if strmode {
+			found := false
+			for i := 1; i < len(text); i++ {
+				ch := text[i]
+				if ch == byte('\\') {
+					i++
+					continue
+				}
+				if ch == stringchar {
+					found = true
+					k := i + 1
+					a, err := strconv.Unquote(text[0:k])
+					if err != nil {
+						return nil, errors.New("misquoted string")
+					}
+					arg = a
+					text = text[k:]
+				}
+			}
+			if !found {
+				return nil, errors.New("unclosed quote")
+			}
+		} else {
+			k := strings.IndexAny(text, " \t")
+			if k < 0 {
+				k = len(text)
+			}
+			arg = text[0:k]
+			text = text[k:]
+		}
+
+		if replace {
+			arg = replaceEnvVar(arg, filepath, filename, lineno)
+		}
+		args = append(args, arg)
+	}
+	return args, nil
+}
+
+func replaceEnvVar(arg string, filepath, filename string, lineno int) string {
+	return arg
+}
+
+func executeJob(args []string, env []string) error {
+	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Env = env
