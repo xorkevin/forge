@@ -168,7 +168,7 @@ func parseLine(line string, prefix, suffix string, filepath, filename string, li
 	directive = strings.TrimSpace(directive)
 	args, err := parseArgs(directive, filename, filepath, lineno)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("failed parsing %s line %d: %s\n", filepath, lineno, err)
 		return nil, "", false
 	}
 	return args, directive, true
@@ -179,13 +179,13 @@ func parseArgs(directive string, filepath, filename string, lineno int) ([]strin
 	for text := directive; len(text) > 0; text = strings.TrimLeft(text, " \t") {
 		replace := true
 		strmode := false
-		stringchar := byte('"')
+		doublequote := true
 
 		switch text[0] {
 		case '\'':
 			replace = false
 			strmode = true
-			stringchar = byte('\'')
+			doublequote = false
 		case '"':
 			strmode = true
 		}
@@ -199,14 +199,18 @@ func parseArgs(directive string, filepath, filename string, lineno int) ([]strin
 					i++
 					continue
 				}
-				if ch == stringchar {
+				if doublequote && ch == '"' || !doublequote && ch == '\'' {
 					found = true
 					k := i + 1
-					a, err := strconv.Unquote(text[0:k])
-					if err != nil {
-						return nil, errors.New("misquoted string")
+					if doublequote {
+						a, err := strconv.Unquote(text[0:k])
+						if err != nil {
+							return nil, errors.New("misquoted string")
+						}
+						arg = a
+					} else {
+						arg = text[1:i]
 					}
-					arg = a
 					text = text[k:]
 				}
 			}
