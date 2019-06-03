@@ -8,8 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
-	"sync"
 )
 
 const (
@@ -18,6 +18,12 @@ const (
 )
 
 func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose bool, args []string) {
+	workingDir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	environ := append(os.Environ(), "FORGEDIR="+workingDir)
+
 	if verbose {
 		fmt.Printf("prefix: %s; suffix: %s; dry-run: %t\n", prefix, suffix, dryRun)
 	}
@@ -80,32 +86,7 @@ func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose b
 		}
 	}
 
-	files := make(chan string)
-	jobs := make(chan string)
-	parserWg := sync.WaitGroup{}
-	executorWg := sync.WaitGroup{}
-	for i := 0; i < 1; i++ {
-		parserWg.Add(1)
-		go fileParser(files, jobs, &parserWg, prefix, suffix, verbose)
-		executorWg.Add(1)
-		go jobExecutor(jobs, &executorWg, dryRun)
-	}
-	for _, i := range filepathSet.list {
-		files <- i
-	}
-	close(files)
-	parserWg.Wait()
-	close(jobs)
-	executorWg.Wait()
-}
-
-func fileParser(files <-chan string, jobs chan<- string, wg *sync.WaitGroup, prefix, suffix string, verbose bool) {
-	defer wg.Done()
-	for {
-		filename, ok := <-files
-		if !ok {
-			return
-		}
+	for _, filename := range filepathSet.list {
 		if verbose {
 			fmt.Printf("parsing: %s\n", filename)
 		}
@@ -114,13 +95,28 @@ func fileParser(files <-chan string, jobs chan<- string, wg *sync.WaitGroup, pre
 			fmt.Printf("failed reading file %s: %s\n", filename, err)
 			continue
 		}
+
+		fileenv := append(environ, "FORGEFILE="+filename)
 		for _, i := range directives {
-			jobs <- i
+			fmt.Printf("forge exec: %s line %d: %s\n", filename, i.line, i.text)
+			if !dryRun {
+				if err := executeJob(i.job, append(fileenv, "FORGELINE="+strconv.Itoa(i.line))); err != nil {
+					fmt.Printf("failed: %s", err)
+				}
+			}
 		}
 	}
 }
 
-func parseFile(filename string, prefix, suffix string) ([]string, error) {
+type (
+	directive struct {
+		line int
+		job  []string
+		text string
+	}
+)
+
+func parseFile(filename string, prefix, suffix string) ([]directive, error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, err
@@ -131,12 +127,16 @@ func parseFile(filename string, prefix, suffix string) ([]string, error) {
 		}
 	}()
 
-	directives := []string{}
+	directives := []directive{}
 	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		directive, ok := parseLine(scanner.Text(), prefix, suffix)
+	for i := 0; scanner.Scan(); i++ {
+		job, text, ok := parseLine(scanner.Text(), prefix, suffix)
 		if ok {
-			directives = append(directives, directive)
+			directives = append(directives, directive{
+				line: i,
+				job:  job,
+				text: text,
+			})
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -145,10 +145,10 @@ func parseFile(filename string, prefix, suffix string) ([]string, error) {
 	return directives, nil
 }
 
-func parseLine(line string, prefix, suffix string) (string, bool) {
+func parseLine(line string, prefix, suffix string) ([]string, string, bool) {
 	prefixLoc := strings.Index(line, prefix)
 	if prefixLoc < 0 {
-		return "", false
+		return nil, "", false
 	}
 	commandLoc := prefixLoc + len(prefix)
 	directive := ""
@@ -158,24 +158,16 @@ func parseLine(line string, prefix, suffix string) (string, bool) {
 	} else {
 		directive = line[commandLoc:]
 	}
-	return strings.TrimSpace(directive), true
+	directive = strings.TrimSpace(directive)
+	return strings.Fields(directive), directive, true
 }
 
-func jobExecutor(jobs <-chan string, wg *sync.WaitGroup, dryRun bool) {
-	defer wg.Done()
-	for {
-		job, ok := <-jobs
-		if !ok {
-			return
-		}
-		fmt.Printf("exec: %s\n", job)
-		if !dryRun {
-			executeJob(job)
-		}
-	}
-}
-
-func executeJob(job string) {
+func executeJob(job []string, env []string) error {
+	cmd := exec.Command(job[0], job[1:]...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Env = env
+	return cmd.Run()
 }
 
 func generateIgnorePathSet() (*pathSet, error) {
