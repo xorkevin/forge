@@ -184,7 +184,12 @@ func parseFile(filepath string, prefix, suffix string) ([]directive, string, err
 		if !utf8.ValidString(text) {
 			return nil, "", errNotUTF8
 		}
-		args, text, err := parseLine(text, prefix, suffix, filepath, filename, i)
+		forgeenv := map[string]string{
+			envforgepath: filepath,
+			envforgefile: filename,
+			envforgeline: strconv.Itoa(i),
+		}
+		args, text, err := parseLine(text, prefix, suffix, forgeenv)
 		if err != nil {
 			if err == errNoPrefix {
 				continue
@@ -203,7 +208,7 @@ func parseFile(filepath string, prefix, suffix string) ([]directive, string, err
 	return directives, filename, nil
 }
 
-func parseLine(line string, prefix, suffix string, filepath, filename string, lineno int) ([]string, string, error) {
+func parseLine(line string, prefix, suffix string, forgeenv map[string]string) ([]string, string, error) {
 	prefixLoc := strings.Index(line, prefix)
 	if prefixLoc < 0 {
 		return nil, "", errNoPrefix
@@ -217,14 +222,14 @@ func parseLine(line string, prefix, suffix string, filepath, filename string, li
 		directive = line[commandLoc:]
 	}
 	directive = strings.TrimSpace(directive)
-	args, err := parseArgs(directive, filename, filepath, lineno)
+	args, err := parseArgs(directive, forgeenv)
 	if err != nil {
 		return nil, "", err
 	}
 	return args, directive, nil
 }
 
-func parseArgs(directive string, filepath, filename string, lineno int) ([]string, error) {
+func parseArgs(directive string, forgeenv map[string]string) ([]string, error) {
 	args := []string{}
 	for text := directive; len(text) > 0; text = strings.TrimLeft(text, " \t") {
 		replace := true
@@ -293,7 +298,7 @@ func parseArgs(directive string, filepath, filename string, lineno int) ([]strin
 		}
 
 		if replace {
-			a, err := replaceEnvVar(arg, filepath, filename, lineno)
+			a, err := replaceEnvVar(arg, forgeenv)
 			if err != nil {
 				return nil, err
 			}
@@ -312,7 +317,7 @@ var (
 	regexAlphanum = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]*$")
 )
 
-func replaceEnvVar(arg string, filepath, filename string, lineno int) (string, error) {
+func replaceEnvVar(arg string, forgeenv map[string]string) (string, error) {
 	s := strings.Builder{}
 	for text := arg; len(text) > 0; {
 		k := strings.IndexAny(text, "$")
@@ -352,26 +357,19 @@ func replaceEnvVar(arg string, filepath, filename string, lineno int) (string, e
 			return "", errInvalidEnvVar
 		}
 
-		s.WriteString(lookupEnv(envvar, envvaldefault, filepath, filename, lineno))
+		s.WriteString(lookupEnv(envvar, envvaldefault, forgeenv))
 	}
 	return s.String(), nil
 }
 
-func lookupEnv(envvar string, envvaldefault string, filepath, filename string, lineno int) string {
-	switch envvar {
-	case envforgepath:
-		return filepath
-	case envforgefile:
-		return filename
-	case envforgeline:
-		return strconv.Itoa(lineno)
-	default:
-		if val, ok := os.LookupEnv(envvar); ok {
-			return val
-		} else {
-			return envvaldefault
-		}
+func lookupEnv(envvar string, envvaldefault string, forgeenv map[string]string) string {
+	if val, ok := forgeenv[envvar]; ok {
+		return val
 	}
+	if val, ok := os.LookupEnv(envvar); ok {
+		return val
+	}
+	return envvaldefault
 }
 
 func executeJob(args []string, env []string) error {
