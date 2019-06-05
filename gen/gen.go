@@ -220,7 +220,6 @@ func parseLine(line string, prefix, suffix string, forgeenv map[string]string) (
 	} else {
 		directive = line[commandLoc:]
 	}
-	directive = strings.TrimSpace(directive)
 	args, err := parseArgs(directive, forgeenv)
 	if err != nil {
 		return nil, "", err
