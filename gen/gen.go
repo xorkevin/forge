@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/hackform/nutcracker"
 	"log"
 	"os"
 	"os/exec"
@@ -63,7 +64,7 @@ func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose b
 	environ := append(os.Environ(), "FORGEDIR="+workingDir)
 
 	if verbose {
-		fmt.Printf("prefix: %s; suffix: %s; dry-run: %t\n", prefix, suffix, dryRun)
+		fmt.Printf("prefix: %s; suffix: %s\n", prefix, suffix)
 	}
 
 	paths := []string{"."}
@@ -89,6 +90,8 @@ func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose b
 			fmt.Println("-", i)
 		}
 	}
+
+	ex := nutcracker.NewExecutor()
 
 	filepathSet := newStringSet(0)
 	for _, i := range paths {
@@ -144,22 +147,46 @@ func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose b
 			continue
 		}
 
+		forgeenv := map[string]string{
+			envforgepath: filepath,
+			envforgefile: filename,
+			envforgeline: "",
+		}
 		fileenv := append(environ, envforgepath+"="+filepath, envforgefile+"="+filename)
 		for _, i := range directives {
 			fmt.Printf("forge exec: %s line %d: %s\n", filepath, i.line, i.text)
 			if !dryRun {
-				if err := executeJob(i.args, append(fileenv, envforgeline+"="+strconv.Itoa(i.line))); err != nil {
+				lineno := strconv.Itoa(i.line)
+				forgeenv[envforgeline] = lineno
+				envvar := append(fileenv, envforgeline+"="+lineno)
+				env := nutcracker.Env{
+					Envvar: envvar,
+					Envfunc: func(name string) string {
+						if val, ok := forgeenv[name]; ok {
+							return val
+						}
+						val, _ := os.LookupEnv(name)
+						return val
+					},
+					Stdout: os.Stdout,
+					Stderr: os.Stderr,
+					Ex:     ex,
+				}
+				if err := i.cmd.Exec(env); err != nil {
 					fmt.Printf("failed: %s", err)
 				}
 			}
 		}
+	}
+	if dryRun {
+		fmt.Printf("dry-run: %t\n", dryRun)
 	}
 }
 
 type (
 	directive struct {
 		line int
-		args []string
+		cmd  *nutcracker.Cmd
 		text string
 	}
 )
@@ -188,7 +215,7 @@ func parseFile(filepath string, prefix, suffix string) ([]directive, string, err
 			envforgefile: filename,
 			envforgeline: strconv.Itoa(i),
 		}
-		args, text, err := parseLine(text, prefix, suffix, forgeenv)
+		cmd, text, err := parseLine(text, prefix, suffix, forgeenv)
 		if err != nil {
 			if err == errNoPrefix {
 				continue
@@ -197,7 +224,7 @@ func parseFile(filepath string, prefix, suffix string) ([]directive, string, err
 		}
 		directives = append(directives, directive{
 			line: i,
-			args: args,
+			cmd:  cmd,
 			text: text,
 		})
 	}
@@ -207,7 +234,7 @@ func parseFile(filepath string, prefix, suffix string) ([]directive, string, err
 	return directives, filename, nil
 }
 
-func parseLine(line string, prefix, suffix string, forgeenv map[string]string) ([]string, string, error) {
+func parseLine(line string, prefix, suffix string, forgeenv map[string]string) (*nutcracker.Cmd, string, error) {
 	prefixLoc := strings.Index(line, prefix)
 	if prefixLoc < 0 {
 		return nil, "", errNoPrefix
@@ -220,19 +247,12 @@ func parseLine(line string, prefix, suffix string, forgeenv map[string]string) (
 	} else {
 		directive = line[commandLoc:]
 	}
-	args, err := parseArgs(directive, forgeenv)
+	directive = strings.TrimSpace(directive)
+	cmd, err := nutcracker.Parse(directive)
 	if err != nil {
 		return nil, "", err
 	}
-	return args, directive, nil
-}
-
-func executeJob(args []string, env []string) error {
-	cmd := exec.Command(args[0], args[1:]...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Env = env
-	return cmd.Run()
+	return cmd, directive, nil
 }
 
 func generateIgnorePathSet() (*stringSet, error) {

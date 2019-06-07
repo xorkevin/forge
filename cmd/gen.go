@@ -23,16 +23,9 @@ Directives appear in the form of:
 
 	<prefix>command args[<suffix>|'\n'|EOF]
 
-forge gen directives end on the first new line or suffix
+forge gen directives end on the first new line or suffix.
 
-Arguments may also be replaced by environment variables:
-
-file.txt:
-	+forge:gen echo $TEST ${TEST} ${BOGUS:-default val} "$TEST ${TEST}" '$TEST ${TEST}' +gen:end
-
-output:
-	$ TEST=test forge gen
-	test test default val test test $TEST ${TEST}
+Shell execution is driven by nutcracker.
 
 By default the files that git ignores will be ignored and git submodules will
 be ignored as well. This behavior may be changed with -i, --noignore.
