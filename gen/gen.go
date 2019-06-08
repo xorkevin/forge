@@ -131,30 +131,31 @@ func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose b
 		}
 	}
 
-	for _, filepath := range filepathSet.list {
+	for _, fpath := range filepathSet.list {
 		if verbose {
-			fmt.Printf("parsing: %s\n", filepath)
+			fmt.Printf("parsing: %s\n", fpath)
 		}
-		directives, filename, err := parseFile(filepath, prefix, suffix)
+		directives, err := parseFile(fpath, prefix, suffix)
 		if err != nil {
 			if err == errNotUTF8 {
 				if verbose {
-					fmt.Printf("ignoring %s: not a utf8 file\n", filepath)
+					fmt.Printf("ignoring %s: not a utf8 file\n", fpath)
 				}
 				continue
 			}
-			fmt.Printf("failed parsing file %s: %s\n", filepath, err)
+			fmt.Printf("failed parsing file %s: %s\n", fpath, err)
 			continue
 		}
 
+		filename := filepath.Base(fpath)
 		forgeenv := map[string]string{
-			envforgepath: filepath,
+			envforgepath: fpath,
 			envforgefile: filename,
 			envforgeline: "",
 		}
-		fileenv := append(environ, envforgepath+"="+filepath, envforgefile+"="+filename)
+		fileenv := append(environ, envforgepath+"="+fpath, envforgefile+"="+filename)
 		for _, i := range directives {
-			fmt.Printf("forge exec: %s line %d: %s\n", filepath, i.line, i.text)
+			fmt.Printf("forge exec: %s line %d: %s\n", fpath, i.line, i.text)
 			if !dryRun {
 				lineno := strconv.Itoa(i.line)
 				forgeenv[envforgeline] = lineno
@@ -191,36 +192,30 @@ type (
 	}
 )
 
-func parseFile(filepath string, prefix, suffix string) ([]directive, string, error) {
-	file, err := os.Open(filepath)
+func parseFile(fpath string, prefix, suffix string) ([]directive, error) {
+	file, err := os.Open(fpath)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
 			log.Fatal(err)
 		}
 	}()
-	filename := file.Name()
 
 	directives := []directive{}
 	scanner := bufio.NewScanner(file)
 	for i := 0; scanner.Scan(); i++ {
 		text := scanner.Text()
 		if !utf8.ValidString(text) {
-			return nil, "", errNotUTF8
+			return nil, errNotUTF8
 		}
-		forgeenv := map[string]string{
-			envforgepath: filepath,
-			envforgefile: filename,
-			envforgeline: strconv.Itoa(i),
-		}
-		cmd, text, err := parseLine(text, prefix, suffix, forgeenv)
+		cmd, text, err := parseLine(text, prefix, suffix)
 		if err != nil {
 			if err == errNoPrefix {
 				continue
 			}
-			return nil, "", fmt.Errorf("line %d: %s", i, err)
+			return nil, fmt.Errorf("line %d: %s", i, err)
 		}
 		directives = append(directives, directive{
 			line: i,
@@ -229,12 +224,12 @@ func parseFile(filepath string, prefix, suffix string) ([]directive, string, err
 		})
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, "", err
+		return nil, err
 	}
-	return directives, filename, nil
+	return directives, nil
 }
 
-func parseLine(line string, prefix, suffix string, forgeenv map[string]string) (*nutcracker.Cmd, string, error) {
+func parseLine(line string, prefix, suffix string) (*nutcracker.Cmd, string, error) {
 	prefixLoc := strings.Index(line, prefix)
 	if prefixLoc < 0 {
 		return nil, "", errNoPrefix
