@@ -27,10 +27,16 @@ forge gen directives end on the first new line or suffix.
 
 Shell execution is driven by nutcracker.
 
-By default the files that git ignores will be ignored and git submodules will
-be ignored as well. This behavior may be changed with -i, --noignore.
+By default the files that git ignores and git submodules will be ignored. This
+behavior may be changed with -i, --noignore.
 
 A dry run of the commands will be shown with the -n flag.
+
+forge gen provides the follwing environment variables to the executed command:
+
+	FORGEPATH: filepath of the file with the forge directive
+	FORGEFILE: filename of the file with the forge directive
+	FORGELINE: beginning line number of the forge directive (zero indexed)
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		gen.Execute(genPrefix, genSuffix, genNoIgnore, genDryRun, genVerbose, args)
