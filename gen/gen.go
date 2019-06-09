@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -18,7 +17,6 @@ import (
 const (
 	envforgepath = "FORGEPATH"
 	envforgefile = "FORGEFILE"
-	envforgeline = "FORGELINE"
 )
 
 var (
@@ -48,15 +46,16 @@ func init() {
 }
 
 var (
-	errNotUTF8        = errors.New("not a utf8 file")
-	errStringMisquote = errors.New("misquoted string")
-	errUnclosedString = errors.New("unclosed string")
-	errUnclosedBrace  = errors.New("unclosed brace")
-	errInvalidEnvVar  = errors.New("invalid env var name")
-	errNoPrefix       = errors.New("no prefix")
+	errNotUTF8 = errors.New("not a utf8 file")
 )
 
 func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose bool, args []string) {
+	if len(prefix) == 0 {
+		log.Fatalln("directive prefix cannot be empty")
+	}
+	if len(suffix) == 0 {
+		log.Fatalln("directive suffix cannot be empty")
+	}
 	workingDir, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
@@ -131,11 +130,13 @@ func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose b
 		}
 	}
 
+	splitDir := makeSplitDirective(prefix, suffix)
+
 	for _, fpath := range filepathSet.list {
 		if verbose {
 			fmt.Printf("parsing: %s\n", fpath)
 		}
-		directives, err := parseFile(fpath, prefix, suffix)
+		directives, err := parseFile(fpath, splitDir)
 		if err != nil {
 			if err == errNotUTF8 {
 				if verbose {
@@ -148,32 +149,27 @@ func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose b
 		}
 
 		filename := filepath.Base(fpath)
-		forgeenv := map[string]string{
-			envforgepath: fpath,
-			envforgefile: filename,
-			envforgeline: "",
-		}
-		fileenv := append(environ, envforgepath+"="+fpath, envforgefile+"="+filename)
-		for _, i := range directives {
-			fmt.Printf("forge exec: %s line %d: %s\n", fpath, i.line, i.text)
-			if !dryRun {
-				lineno := strconv.Itoa(i.line)
-				forgeenv[envforgeline] = lineno
-				envvar := append(fileenv, envforgeline+"="+lineno)
-				env := nutcracker.Env{
-					Envvar: envvar,
-					Envfunc: func(name string) string {
-						if val, ok := forgeenv[name]; ok {
-							return val
-						}
-						val, _ := os.LookupEnv(name)
-						return val
-					},
-					Stdout: os.Stdout,
-					Stderr: os.Stderr,
-					Ex:     ex,
+		envvar := nutcracker.Env{
+			Envvar: append(environ, envforgepath+"="+fpath, envforgefile+"="+filename),
+			Envfunc: func(name string) string {
+				switch name {
+				case envforgepath:
+					return fpath
+				case envforgefile:
+					return filename
+				default:
+					val, _ := os.LookupEnv(name)
+					return val
 				}
-				if err := i.cmd.Exec(env); err != nil {
+			},
+			Stdout: os.Stdout,
+			Stderr: os.Stderr,
+			Ex:     ex,
+		}
+		for _, i := range directives {
+			fmt.Printf("forge exec: %s count %d: %s\n", fpath, i.count, i.text)
+			if !dryRun {
+				if err := i.cmd.Exec(envvar); err != nil {
 					fmt.Printf("failed: %s", err)
 				}
 			}
@@ -184,15 +180,58 @@ func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose b
 	}
 }
 
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func makeSplitDirective(prefix, suffix string) bufio.SplitFunc {
+	prefixBytes := []byte(prefix)
+	suffixBytes := []byte(suffix)
+	prefixLen := len(prefixBytes)
+	suffixLen := len(suffixBytes)
+
+	return func(data []byte, atEOF bool) (int, []byte, error) {
+		if atEOF && len(data) == 0 {
+			return 0, nil, nil
+		}
+		if !utf8.Valid(data) {
+			return 0, nil, errNotUTF8
+		}
+
+		prefixLoc := bytes.Index(data, prefixBytes)
+
+		if prefixLoc < 0 {
+			if atEOF {
+				// no directive present, read until end of file
+				return len(data), nil, nil
+			}
+
+			// save len(prefix)-1 bytes since they might contain prefix beginning
+			return maxInt(len(data)-prefixLen+1, 0), nil, nil
+		}
+
+		suffixLoc := bytes.Index(data, suffixBytes)
+
+		if suffixLoc < prefixLoc+prefixLen {
+			return prefixLoc, nil, nil
+		}
+
+		return suffixLoc + suffixLen, data[prefixLoc+prefixLen : suffixLoc], nil
+	}
+}
+
 type (
 	directive struct {
-		line int
-		cmd  *nutcracker.Cmd
-		text string
+		count int
+		cmd   *nutcracker.Cmd
+		text  string
 	}
 )
 
-func parseFile(fpath string, prefix, suffix string) ([]directive, error) {
+func parseFile(fpath string, splitDirective bufio.SplitFunc) ([]directive, error) {
 	file, err := os.Open(fpath)
 	if err != nil {
 		return nil, err
@@ -205,22 +244,16 @@ func parseFile(fpath string, prefix, suffix string) ([]directive, error) {
 
 	directives := []directive{}
 	scanner := bufio.NewScanner(file)
+	scanner.Split(splitDirective)
 	for i := 0; scanner.Scan(); i++ {
-		text := scanner.Text()
-		if !utf8.ValidString(text) {
-			return nil, errNotUTF8
-		}
-		cmd, text, err := parseLine(text, prefix, suffix)
+		cmd, text, err := parseDirective(scanner.Text())
 		if err != nil {
-			if err == errNoPrefix {
-				continue
-			}
-			return nil, fmt.Errorf("line %d: %s", i, err)
+			return nil, fmt.Errorf("count %d: %s", i, err)
 		}
 		directives = append(directives, directive{
-			line: i,
-			cmd:  cmd,
-			text: text,
+			count: i,
+			cmd:   cmd,
+			text:  text,
 		})
 	}
 	if err := scanner.Err(); err != nil {
@@ -229,19 +262,7 @@ func parseFile(fpath string, prefix, suffix string) ([]directive, error) {
 	return directives, nil
 }
 
-func parseLine(line string, prefix, suffix string) (*nutcracker.Cmd, string, error) {
-	prefixLoc := strings.Index(line, prefix)
-	if prefixLoc < 0 {
-		return nil, "", errNoPrefix
-	}
-	commandLoc := prefixLoc + len(prefix)
-	directive := ""
-	suffixLoc := strings.Index(line, suffix)
-	if suffixLoc > commandLoc {
-		directive = line[commandLoc:suffixLoc]
-	} else {
-		directive = line[commandLoc:]
-	}
+func parseDirective(directive string) (*nutcracker.Cmd, string, error) {
 	directive = strings.TrimSpace(directive)
 	cmd, err := nutcracker.Parse(directive)
 	if err != nil {

@@ -21,7 +21,7 @@ var genCmd = &cobra.Command{
 
 Directives appear in the form of:
 
-	<prefix>command args[<suffix>|'\n'|EOF]
+	<prefix>command args...<suffix>
 
 forge gen directives end on the first new line or suffix.
 
@@ -36,7 +36,6 @@ forge gen provides the follwing environment variables to the executed command:
 
 	FORGEPATH: filepath of the file with the forge directive
 	FORGEFILE: filename of the file with the forge directive
-	FORGELINE: beginning line number of the forge directive (zero indexed)
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		gen.Execute(genPrefix, genSuffix, genNoIgnore, genDryRun, genVerbose, args)
