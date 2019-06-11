@@ -268,7 +268,7 @@ func parseDirective(directive string) (*nutcracker.Cmd, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	return cmd, directive, nil
+	return cmd, strings.ReplaceAll(directive, "\n", "\\n"), nil
 }
 
 func generateIgnorePathSet() (*stringSet, error) {
