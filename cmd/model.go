@@ -15,9 +15,49 @@ var (
 
 // modelCmd represents the model command
 var modelCmd = &cobra.Command{
-	Use:   "model",
+	Use:   "model [query ...]",
 	Short: "Generates models",
-	Long:  `Generates common SQL patterns needed for relational models`,
+	Long: `Generates common SQL patterns needed for relational models
+
+forge model is called with the following environment variables:
+
+	GOPACKAGE: name of the go package
+	GOFILE: name of the go source file
+
+forge model code generates go functions for SQL select, insert, update, and
+delete for a model by default, with additional queries provided as arguments.
+
+The SQL table's columns for a model are specified by the "model" tag on fields
+of a Go struct representing a row of the table. A "model" tag's value has the
+following syntax:
+
+	column_name,sql_type
+
+Field without a "model" tag are ignored.
+
+One field must contain a sql_type with "PRIMARY KEY".
+
+A query allows additional common case select statements to be code generated.
+It is specified by a "query" tag on a struct representing a row of the query
+result with a value of the syntax:
+
+	column_name[;flag[,args ...] ...]
+
+column_name refers to the column name defined in the model. The go field type
+must also be the same between the model and the query.
+
+Fields without a "query" tag are ignored.
+
+Valid flags are:
+	- get: (no args), gets a single row where the field value is equal to the
+		input
+	- getgroup: (no args), gets all rows where the field value is equal to the
+		input
+	- getgroupeq: args(equal_field), gets all rows where the equal field value
+		is equal to the input ordered by the field value
+	- getgroupset: (no args), gets all rows where the field value is in the input
+		set ordered by the field value
+`,
 	Run: func(cmd *cobra.Command, args []string) {
 		model.Execute(modelVerbose, modelOutputFile, modelOutputPrefix, modelTableName, modelModelName, args)
 	},
