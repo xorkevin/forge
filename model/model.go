@@ -351,7 +351,7 @@ func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([
 	for n, i := range astfields {
 		props := strings.SplitN(i.Tags, ",", 2)
 		if len(props) < 1 {
-			log.Fatal("Field tag must be dbname,flag(optional),args(optional)[;...]")
+			log.Fatal("Field tag must be dbname[,flag[,args ...][; ...]]")
 		}
 		dbName := props[0]
 		modelField, ok := seenFields[dbName]
