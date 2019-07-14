@@ -44,13 +44,15 @@ type (
 	}
 
 	ValidationTemplateData struct {
-		Prefix string
-		Ident  string
-		Fields []ValidationField
+		Prefix      string
+		Ident       string
+		PrefixValid string
+		PrefixHas   string
+		Fields      []ValidationField
 	}
 )
 
-func Execute(verbose bool, generatedFilepath, prefix, prefixValidate, prefixHas string, validationIdents []string) {
+func Execute(verbose bool, generatedFilepath, prefix, prefixValid, prefixHas string, validationIdents []string) {
 	gopackage := os.Getenv("GOPACKAGE")
 	if len(gopackage) == 0 {
 		log.Fatal("Environment variable GOPACKAGE not provided by go generate")
@@ -102,9 +104,11 @@ func Execute(verbose bool, generatedFilepath, prefix, prefixValidate, prefixHas 
 			}
 		}
 		tplData := ValidationTemplateData{
-			Prefix: prefix,
-			Ident:  i.Ident,
-			Fields: i.Fields,
+			Prefix:      prefix,
+			Ident:       i.Ident,
+			PrefixValid: prefixValid,
+			PrefixHas:   prefixHas,
+			Fields:      i.Fields,
 		}
 		if err := tplvalidate.Execute(genFileWriter, tplData); err != nil {
 			log.Fatal(err)
