@@ -32,8 +32,7 @@ func init() {
 	// and all subcommands, e.g.:
 	// validationCmd.PersistentFlags().String("foo", "", "A help for foo")
 	validationCmd.PersistentFlags().StringVarP(&validationOutputFile, "output", "o", "validation_gen.go", "output filename")
-	validationCmd.PersistentFlags().StringVarP(&validationOutputPrefix, "prefix", "p", "", "prefix of identifiers in generated file")
-	validationCmd.MarkFlagRequired("prefix")
+	validationCmd.PersistentFlags().StringVarP(&validationOutputPrefix, "prefix", "p", "valid", "prefix of identifiers in generated file")
 	validationCmd.PersistentFlags().StringVarP(&validationValidatePrefix, "validatep", "c", "valid", "prefix of validation functions")
 	validationCmd.PersistentFlags().StringVarP(&validationHasPrefix, "hasp", "d", "validhas", "prefix of has functions")
 	validationCmd.PersistentFlags().BoolVarP(&validationVerbose, "verbose", "v", false, "increase the verbosity of output")
