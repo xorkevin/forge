@@ -5,13 +5,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/hackform/nutcracker"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"unicode/utf8"
+	"xorkevin.dev/nutcracker"
 )
 
 const (

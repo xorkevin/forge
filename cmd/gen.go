@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"github.com/hackform/forge/gen"
 	"github.com/spf13/cobra"
+	"xorkevin.dev/forge/gen"
 )
 
 var (

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/hackform/forge/cmd"
+	"xorkevin.dev/forge/cmd"
 )
 
 func main() {
