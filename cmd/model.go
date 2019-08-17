@@ -51,8 +51,7 @@ Fields without a "query" tag are ignored.
 Valid flags are:
 	- get: (no args), gets a single row where the field value is equal to the
 		input
-	- getgroup: (no args), gets all rows where the field value is equal to the
-		input
+	- getgroup: (no args), gets all rows ordered by the field value
 	- getgroupeq: args(equal_field), gets all rows where the equal field value
 		is equal to the input ordered by the field value
 	- getgroupset: (no args), gets all rows where the field value is in the input
