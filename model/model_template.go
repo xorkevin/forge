@@ -23,6 +23,14 @@ func {{.Prefix}}ModelGet(db *sql.DB, key {{.PrimaryKey.GoType}}) (*{{.ModelIdent
 		if err == sql.ErrNoRows {
 			return nil, 2, err
 		}
+		if postgresErr, ok := err.(*pq.Error); ok {
+			switch postgresErr.Code {
+			case "42P01": // undefined_table
+				return 4, err
+			default:
+				return 0, err
+			}
+		}
 		return nil, 0, err
 	}
 	return m, 0, nil
