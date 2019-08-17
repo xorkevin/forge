@@ -7,6 +7,14 @@ func {{.Prefix}}ModelGet{{.ModelIdent}}By{{.PrimaryField.Ident}}(db *sql.DB, key
 		if err == sql.ErrNoRows {
 			return nil, 2, err
 		}
+		if postgresErr, ok := err.(*pq.Error); ok {
+			switch postgresErr.Code {
+			case "42P01": // undefined_table
+				return nil, 4, err
+			default:
+				return nil, 0, err
+			}
+		}
 		return nil, 0, err
 	}
 	return m, 0, nil
