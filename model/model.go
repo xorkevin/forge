@@ -59,11 +59,14 @@ type (
 	}
 
 	ModelSQLStrings struct {
-		Setup        string
-		DBNames      string
-		Placeholders string
-		Idents       string
-		IdentRefs    string
+		Setup            string
+		DBNames          string
+		Placeholders     string
+		PlaceholderTpl   string
+		PlaceholderCount string
+		Idents           string
+		IdentRefs        string
+		ColNum           string
 	}
 
 	ModelTemplateData struct {
@@ -443,16 +446,22 @@ func dbTypeIsArray(dbType string) bool {
 }
 
 func (m *ModelDef) genModelSQL() ModelSQLStrings {
-	sqlDefs := make([]string, 0, len(m.Fields))
-	sqlDBNames := make([]string, 0, len(m.Fields))
-	sqlPlaceholders := make([]string, 0, len(m.Fields))
-	sqlIdents := make([]string, 0, len(m.Fields))
-	sqlIdentRefs := make([]string, 0, len(m.Fields))
+	colNum := len(m.Fields)
+	sqlDefs := make([]string, 0, colNum)
+	sqlDBNames := make([]string, 0, colNum)
+	sqlPlaceholders := make([]string, 0, colNum)
+	sqlPlaceholderTpl := make([]string, 0, colNum)
+	sqlPlaceholderCount := make([]string, 0, colNum)
+	sqlIdents := make([]string, 0, colNum)
+	sqlIdentRefs := make([]string, 0, colNum)
 
+	placeholderStart := 1
 	for n, i := range m.Fields {
 		sqlDefs = append(sqlDefs, fmt.Sprintf("%s %s", i.DBName, i.DBType))
 		sqlDBNames = append(sqlDBNames, i.DBName)
-		sqlPlaceholders = append(sqlPlaceholders, fmt.Sprintf("$%d", n+1))
+		sqlPlaceholders = append(sqlPlaceholders, fmt.Sprintf("$%d", n+placeholderStart))
+		sqlPlaceholderTpl = append(sqlPlaceholderTpl, "$%d")
+		sqlPlaceholderCount = append(sqlPlaceholderCount, fmt.Sprintf("n+%d", n+placeholderStart))
 		if dbTypeIsArray(i.DBType) {
 			sqlIdents = append(sqlIdents, fmt.Sprintf("pq.Array(m.%s)", i.Ident))
 			sqlIdentRefs = append(sqlIdentRefs, fmt.Sprintf("pq.Array(&m.%s)", i.Ident))
@@ -463,11 +472,14 @@ func (m *ModelDef) genModelSQL() ModelSQLStrings {
 	}
 
 	return ModelSQLStrings{
-		Setup:        strings.Join(sqlDefs, ", "),
-		DBNames:      strings.Join(sqlDBNames, ", "),
-		Placeholders: strings.Join(sqlPlaceholders, ", "),
-		Idents:       strings.Join(sqlIdents, ", "),
-		IdentRefs:    strings.Join(sqlIdentRefs, ", "),
+		Setup:            strings.Join(sqlDefs, ", "),
+		DBNames:          strings.Join(sqlDBNames, ", "),
+		Placeholders:     strings.Join(sqlPlaceholders, ", "),
+		PlaceholderTpl:   strings.Join(sqlPlaceholderTpl, ", "),
+		PlaceholderCount: strings.Join(sqlPlaceholderCount, ", "),
+		Idents:           strings.Join(sqlIdents, ", "),
+		IdentRefs:        strings.Join(sqlIdentRefs, ", "),
+		ColNum:           fmt.Sprintf("%d", colNum),
 	}
 }
 

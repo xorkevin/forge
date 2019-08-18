@@ -1,6 +1,6 @@
 package model
 
-const importsQueryGroupSet = `"strconv" "strings"`
+const importsQueryGroupSet = `"strconv"`
 
 const templateQueryGroupSet = `
 func {{.Prefix}}ModelGet{{.ModelIdent}}Set{{.PrimaryField.Ident}}(db *sql.DB, keys []{{.PrimaryField.GoType}}) ([]{{.ModelIdent}}, error) {
