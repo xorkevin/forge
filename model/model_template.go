@@ -53,7 +53,7 @@ func {{.Prefix}}ModelInsert(db *sql.DB, m *{{.ModelIdent}}) (int, error) {
 	return 0, nil
 }
 
-func {{.Prefix}}ModelInsertBulk(db *sql.DB, models []{{.ModelIdent}}, allowConflict bool) (int, error) {
+func {{.Prefix}}ModelInsertBulk(db *sql.DB, models []*{{.ModelIdent}}, allowConflict bool) (int, error) {
 	conflictSQL := ""
 	if allowConflict {
 		conflictSQL = " ON CONFLICT DO NOTHING"
