@@ -1,13 +1,11 @@
 package model
 
-const importsQueryGroupSet = `"strconv"`
-
 const templateQueryGroupSet = `
 func {{.Prefix}}ModelGet{{.ModelIdent}}Set{{.PrimaryField.Ident}}(db *sql.DB, keys []{{.PrimaryField.GoType}}) ([]{{.ModelIdent}}, error) {
 	placeholderStart := 1
 	placeholders := make([]string, 0, len(keys))
 	for i := range keys {
-		placeholders = append(placeholders, "($"+strconv.Itoa(i+placeholderStart)+")")
+		placeholders = append(placeholders, fmt.Sprintf("($%d)", i+placeholderStart))
 	}
 
 	args := make([]interface{}, 0, len(keys))

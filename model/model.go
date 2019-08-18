@@ -403,9 +403,6 @@ func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([
 						log.Fatal("Field tag must be dbname,flag for field " + i.Ident)
 					}
 				}
-				if tagflag == flagGetGroupSet {
-					deps.Add(importsQueryGroupSet)
-				}
 				queryFields = append(queryFields, f)
 			}
 		}
