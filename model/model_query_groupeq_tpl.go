@@ -1,13 +1,13 @@
 package model
 
 const templateQueryGroupEq = `
-func {{.Prefix}}ModelGet{{.ModelIdent}}Eq{{.PrimaryField.Cond.Ident}}Ord{{.PrimaryField.Ident}}(db *sql.DB, key {{.PrimaryField.Cond.GoType}}, orderasc bool, limit, offset int) ([]{{.ModelIdent}}, error) {
+func {{.Prefix}}ModelGet{{.ModelIdent}}Eq{{.SQLCond.IdentNames}}Ord{{.PrimaryField.Ident}}(db *sql.DB, {{.SQLCond.IdentParams}}, orderasc bool, limit, offset int) ([]{{.ModelIdent}}, error) {
 	order := "DESC"
 	if orderasc {
 		order = "ASC"
 	}
 	res := make([]{{.ModelIdent}}, 0, limit)
-	rows, err := db.Query("SELECT {{.SQL.DBNames}} FROM {{.TableName}} WHERE {{.PrimaryField.Cond.DBName}} = $1 ORDER BY {{.PrimaryField.DBName}} "+order+" LIMIT $2 OFFSET $3;", key, limit, offset)
+	rows, err := db.Query("SELECT {{.SQL.DBNames}} FROM {{.TableName}} WHERE {{.SQLCond.DBCond}} ORDER BY {{.PrimaryField.DBName}} "+order+" LIMIT $1 OFFSET $2;", limit, offset, {{.SQLCond.IdentArgs}})
 	if err != nil {
 		return nil, err
 	}

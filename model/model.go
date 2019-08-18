@@ -55,7 +55,7 @@ type (
 		DBType string
 		Num    int
 		Mode   int
-		Cond   ModelField
+		Cond   []ModelField
 	}
 
 	ModelSQLStrings struct {
@@ -82,12 +82,20 @@ type (
 		IdentRefs string
 	}
 
+	QueryCondSQLStrings struct {
+		DBCond      string
+		IdentParams string
+		IdentArgs   string
+		IdentNames  string
+	}
+
 	QueryTemplateData struct {
 		Prefix       string
 		TableName    string
 		ModelIdent   string
 		PrimaryField QueryField
 		SQL          QuerySQLStrings
+		SQLCond      QueryCondSQLStrings
 	}
 )
 
@@ -191,6 +199,7 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 					log.Fatal(err)
 				}
 			case flagGetGroupEq:
+				tplData.SQLCond = i.genQueryCondSQL()
 				if err := tplquerygroupeq.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
@@ -374,15 +383,18 @@ func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([
 				f.Mode = tagflag
 				switch tagflag {
 				case flagGetGroupEq:
-					if len(tags) != 2 {
-						log.Fatal("Field tag must be dbname,flag,eqcond for field " + i.Ident)
+					if len(tags) < 2 {
+						log.Fatal("Field tag must be dbname,flag,eqcond,... for field " + i.Ident)
 					}
-					cond := tags[1]
-					if modelField, ok := seenFields[cond]; ok {
-						f.Cond = modelField
-					} else {
-						log.Fatal("Invalid eq condition field for field " + i.Ident)
+					k := make([]ModelField, 0, len(tags[1:]))
+					for _, cond := range tags[1:] {
+						if modelField, ok := seenFields[cond]; ok {
+							k = append(k, modelField)
+						} else {
+							log.Fatal("Invalid eq condition field for field " + i.Ident)
+						}
 					}
+					f.Cond = k
 				default:
 					if len(tags) != 1 {
 						log.Fatal("Field tag must be dbname,flag for field " + i.Ident)
@@ -475,6 +487,27 @@ func (q *QueryDef) genQuerySQL() QuerySQLStrings {
 	return QuerySQLStrings{
 		DBNames:   strings.Join(sqlDBNames, ", "),
 		IdentRefs: strings.Join(sqlIdentRefs, ", "),
+	}
+}
+
+func (q *QueryField) genQueryCondSQL() QueryCondSQLStrings {
+	sqlDBCond := make([]string, 0, len(q.Cond))
+	sqlIdentParams := make([]string, 0, len(q.Cond))
+	sqlIdentArgs := make([]string, 0, len(q.Cond))
+	sqlIdentNames := make([]string, 0, len(q.Cond))
+	offset := 3
+	for n, i := range q.Cond {
+		paramName := strings.ToLower(i.Ident)
+		sqlDBCond = append(sqlDBCond, fmt.Sprintf("%s = $%d", i.DBName, offset+n))
+		sqlIdentParams = append(sqlIdentParams, fmt.Sprintf("%s %s", paramName, i.GoType))
+		sqlIdentArgs = append(sqlIdentArgs, paramName)
+		sqlIdentNames = append(sqlIdentNames, i.Ident)
+	}
+	return QueryCondSQLStrings{
+		DBCond:      strings.Join(sqlDBCond, " AND "),
+		IdentParams: strings.Join(sqlIdentParams, ", "),
+		IdentArgs:   strings.Join(sqlIdentArgs, ", "),
+		IdentNames:  strings.Join(sqlIdentNames, ""),
 	}
 }
 
