@@ -56,6 +56,8 @@ Valid flags are:
 		value(s) is equal to the input ordered by the field value
 	- getgroupset: (no args), gets all rows where the field value is in the input
 		set ordered by the field value
+	- delgroupeq: args(equal_field,...), deletes all rows where the equal
+		fields(s) values(s) is equal to the input
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		model.Execute(modelVerbose, modelOutputFile, modelOutputPrefix, modelTableName, modelModelName, args)
