@@ -4,22 +4,16 @@ const templateQueryGroupSet = `
 func {{.Prefix}}ModelGet{{.ModelIdent}}Set{{.PrimaryField.Ident}}(db *sql.DB, keys []{{.PrimaryField.GoType}}) ([]{{.ModelIdent}}, error) {
 	placeholderStart := 1
 	placeholders := make([]string, 0, len(keys))
-	for i := range keys {
-		placeholders = append(placeholders, fmt.Sprintf("($%d)", i+placeholderStart))
-	}
-
 	args := make([]interface{}, 0, len(keys))
-	for _, i := range keys {
+	for n, i := range keys {
+		placeholders = append(placeholders, fmt.Sprintf("($%d)", n+placeholderStart))
 		args = append(args, i)
 	}
-
-	stmt := "SELECT {{.SQL.DBNames}} FROM {{.TableName}} WHERE {{.PrimaryField.DBName}} IN (VALUES " + strings.Join(placeholders, ",") + ");"
-
-	res := make([]{{.ModelIdent}}, 0, len(keys))
-	rows, err := db.Query(stmt, args...)
+	rows, err := db.Query("SELECT {{.SQL.DBNames}} FROM {{.TableName}} WHERE {{.PrimaryField.DBName}} IN (VALUES "+strings.Join(placeholders, ", ")+");", args...)
 	if err != nil {
 		return nil, err
 	}
+	res := make([]{{.ModelIdent}}, 0, len(keys))
 	defer func() {
 		if err := rows.Close(); err != nil {
 		}

@@ -153,6 +153,11 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 		log.Fatal(err)
 	}
 
+	tpldelgroupset, err := template.New("delgroupset").Parse(templateDelGroupSet)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	genfile, err := os.OpenFile(generatedFilepath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
 	if err != nil {
 		log.Fatal(err)
@@ -218,6 +223,10 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 			case flagDelGroupEq:
 				tplData.SQLCond = i.genQueryCondSQL(0)
 				if err := tpldelgroupeq.Execute(genFileWriter, tplData); err != nil {
+					log.Fatal(err)
+				}
+			case flagDelGroupSet:
+				if err := tpldelgroupset.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
 			}
@@ -444,6 +453,7 @@ const (
 	flagGetGroupEq
 	flagGetGroupSet
 	flagDelGroupEq
+	flagDelGroupSet
 )
 
 func parseFlag(flag string) int {
@@ -458,6 +468,8 @@ func parseFlag(flag string) int {
 		return flagGetGroupSet
 	case "delgroupeq":
 		return flagDelGroupEq
+	case "delgroupset":
+		return flagDelGroupSet
 	default:
 		log.Fatal("Illegal flag " + flag)
 	}
