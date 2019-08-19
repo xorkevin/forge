@@ -148,6 +148,11 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 		log.Fatal(err)
 	}
 
+	tpldelgroupeq, err := template.New("delgroupeq").Parse(templateDelGroupEq)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	genfile, err := os.OpenFile(generatedFilepath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
 	if err != nil {
 		log.Fatal(err)
@@ -202,12 +207,17 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 					log.Fatal(err)
 				}
 			case flagGetGroupEq:
-				tplData.SQLCond = i.genQueryCondSQL()
+				tplData.SQLCond = i.genQueryCondSQL(2)
 				if err := tplquerygroupeq.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
 			case flagGetGroupSet:
 				if err := tplquerygroupset.Execute(genFileWriter, tplData); err != nil {
+					log.Fatal(err)
+				}
+			case flagDelGroupEq:
+				tplData.SQLCond = i.genQueryCondSQL(0)
+				if err := tpldelgroupeq.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
 			}
@@ -398,6 +408,19 @@ func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([
 						}
 					}
 					f.Cond = k
+				case flagDelGroupEq:
+					if len(tags) < 2 {
+						log.Fatal("Field tag must be dbname,flag,eqcond,... for field " + i.Ident)
+					}
+					k := make([]ModelField, 0, len(tags[1:]))
+					for _, cond := range tags[1:] {
+						if modelField, ok := seenFields[cond]; ok {
+							k = append(k, modelField)
+						} else {
+							log.Fatal("Invalid eq condition field for field " + i.Ident)
+						}
+					}
+					f.Cond = k
 				default:
 					if len(tags) != 1 {
 						log.Fatal("Field tag must be dbname,flag for field " + i.Ident)
@@ -420,6 +443,7 @@ const (
 	flagGetGroup
 	flagGetGroupEq
 	flagGetGroupSet
+	flagDelGroupEq
 )
 
 func parseFlag(flag string) int {
@@ -432,6 +456,8 @@ func parseFlag(flag string) int {
 		return flagGetGroupEq
 	case "getgroupset":
 		return flagGetGroupSet
+	case "delgroupeq":
+		return flagDelGroupEq
 	default:
 		log.Fatal("Illegal flag " + flag)
 	}
@@ -499,15 +525,15 @@ func (q *QueryDef) genQuerySQL() QuerySQLStrings {
 	}
 }
 
-func (q *QueryField) genQueryCondSQL() QueryCondSQLStrings {
+func (q *QueryField) genQueryCondSQL(offset int) QueryCondSQLStrings {
 	sqlDBCond := make([]string, 0, len(q.Cond))
 	sqlIdentParams := make([]string, 0, len(q.Cond))
 	sqlIdentArgs := make([]string, 0, len(q.Cond))
 	sqlIdentNames := make([]string, 0, len(q.Cond))
-	offset := 3
+	placeholderStart := 1
 	for n, i := range q.Cond {
 		paramName := strings.ToLower(i.Ident)
-		sqlDBCond = append(sqlDBCond, fmt.Sprintf("%s = $%d", i.DBName, offset+n))
+		sqlDBCond = append(sqlDBCond, fmt.Sprintf("%s = $%d", i.DBName, n+offset+placeholderStart))
 		sqlIdentParams = append(sqlIdentParams, fmt.Sprintf("%s %s", paramName, i.GoType))
 		sqlIdentArgs = append(sqlIdentArgs, paramName)
 		sqlIdentNames = append(sqlIdentNames, i.Ident)
