@@ -81,8 +81,10 @@ type (
 	}
 
 	QuerySQLStrings struct {
-		DBNames   string
-		IdentRefs string
+		DBNames      string
+		Placeholders string
+		Idents       string
+		IdentRefs    string
 	}
 
 	QueryCondSQLStrings struct {
@@ -144,6 +146,11 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 	}
 
 	tplquerygroupset, err := template.New("groupset").Parse(templateQueryGroupSet)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	tplupdgroupeq, err := template.New("updgroupeq").Parse(templateUpdGroupEq)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -218,6 +225,11 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 				}
 			case flagGetGroupSet:
 				if err := tplquerygroupset.Execute(genFileWriter, tplData); err != nil {
+					log.Fatal(err)
+				}
+			case flagUpdGroupEq:
+				tplData.SQLCond = i.genQueryCondSQL(len(queryDef.Fields))
+				if err := tplupdgroupeq.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
 			case flagDelGroupEq:
@@ -417,6 +429,19 @@ func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([
 						}
 					}
 					f.Cond = k
+				case flagUpdGroupEq:
+					if len(tags) < 2 {
+						log.Fatal("Field tag must be dbname,flag,eqcond,... for field " + i.Ident)
+					}
+					k := make([]ModelField, 0, len(tags[1:]))
+					for _, cond := range tags[1:] {
+						if modelField, ok := seenFields[cond]; ok {
+							k = append(k, modelField)
+						} else {
+							log.Fatal("Invalid eq condition field for field " + i.Ident)
+						}
+					}
+					f.Cond = k
 				case flagDelGroupEq:
 					if len(tags) < 2 {
 						log.Fatal("Field tag must be dbname,flag,eqcond,... for field " + i.Ident)
@@ -452,6 +477,8 @@ const (
 	flagGetGroup
 	flagGetGroupEq
 	flagGetGroupSet
+	flagUpdGroupEq
+	flagUpdGroupSet
 	flagDelGroupEq
 	flagDelGroupSet
 )
@@ -466,6 +493,10 @@ func parseFlag(flag string) int {
 		return flagGetGroupEq
 	case "getgroupset":
 		return flagGetGroupSet
+	case "updgroupeq":
+		return flagUpdGroupEq
+	case "updgroupset":
+		return flagUpdGroupSet
 	case "delgroupeq":
 		return flagDelGroupEq
 	case "delgroupset":
@@ -519,21 +550,30 @@ func (m *ModelDef) genModelSQL() ModelSQLStrings {
 }
 
 func (q *QueryDef) genQuerySQL() QuerySQLStrings {
-	sqlDBNames := make([]string, 0, len(q.Fields))
-	sqlIdentRefs := make([]string, 0, len(q.Fields))
+	colNum := len(q.Fields)
+	sqlDBNames := make([]string, 0, colNum)
+	sqlPlaceholders := make([]string, 0, colNum)
+	sqlIdents := make([]string, 0, colNum)
+	sqlIdentRefs := make([]string, 0, colNum)
 
-	for _, i := range q.Fields {
+	placeholderStart := 1
+	for n, i := range q.Fields {
 		sqlDBNames = append(sqlDBNames, i.DBName)
+		sqlPlaceholders = append(sqlPlaceholders, fmt.Sprintf("$%d", n+placeholderStart))
 		if dbTypeIsArray(i.DBType) {
+			sqlIdents = append(sqlIdents, fmt.Sprintf("pq.Array(m.%s)", i.Ident))
 			sqlIdentRefs = append(sqlIdentRefs, fmt.Sprintf("pq.Array(&m.%s)", i.Ident))
 		} else {
+			sqlIdents = append(sqlIdents, fmt.Sprintf("m.%s", i.Ident))
 			sqlIdentRefs = append(sqlIdentRefs, fmt.Sprintf("&m.%s", i.Ident))
 		}
 	}
 
 	return QuerySQLStrings{
-		DBNames:   strings.Join(sqlDBNames, ", "),
-		IdentRefs: strings.Join(sqlIdentRefs, ", "),
+		DBNames:      strings.Join(sqlDBNames, ", "),
+		Placeholders: strings.Join(sqlPlaceholders, ", "),
+		Idents:       strings.Join(sqlIdents, ", "),
+		IdentRefs:    strings.Join(sqlIdentRefs, ", "),
 	}
 }
 
