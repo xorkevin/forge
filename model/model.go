@@ -85,6 +85,7 @@ type (
 		Placeholders string
 		Idents       string
 		IdentRefs    string
+		ColNum       string
 	}
 
 	QueryCondSQLStrings struct {
@@ -151,6 +152,11 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 	}
 
 	tplupdgroupeq, err := template.New("updgroupeq").Parse(templateUpdGroupEq)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	tplupdgroupset, err := template.New("updgroupset").Parse(templateUpdGroupSet)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -230,6 +236,10 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 			case flagUpdGroupEq:
 				tplData.SQLCond = i.genQueryCondSQL(len(queryDef.Fields))
 				if err := tplupdgroupeq.Execute(genFileWriter, tplData); err != nil {
+					log.Fatal(err)
+				}
+			case flagUpdGroupSet:
+				if err := tplupdgroupset.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
 			case flagDelGroupEq:
@@ -574,6 +584,7 @@ func (q *QueryDef) genQuerySQL() QuerySQLStrings {
 		Placeholders: strings.Join(sqlPlaceholders, ", "),
 		Idents:       strings.Join(sqlIdents, ", "),
 		IdentRefs:    strings.Join(sqlIdentRefs, ", "),
+		ColNum:       fmt.Sprintf("%d", colNum),
 	}
 }
 
