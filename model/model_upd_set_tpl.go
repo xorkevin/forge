@@ -1,6 +1,6 @@
 package model
 
-const templateUpdGroupSet = `
+const templateUpdSet = `
 func {{.Prefix}}ModelUpdate{{.ModelIdent}}Set{{.PrimaryField.Ident}}(db *sql.DB, m *{{.ModelIdent}}, keys []{{.PrimaryField.GoType}}) error {
 	placeholderStart := {{.SQL.ColNum}}
 	placeholders := make([]string, 0, len(keys))

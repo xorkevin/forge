@@ -19,25 +19,6 @@ func {{.Prefix}}ModelSetup(db *sql.DB) error {
 	return err
 }
 
-func {{.Prefix}}ModelGet(db *sql.DB, key {{.PrimaryKey.GoType}}) (*{{.ModelIdent}}, int, error) {
-	m := &{{.ModelIdent}}{}
-	if err := db.QueryRow("SELECT {{.SQL.DBNames}} FROM {{.TableName}} WHERE {{.PrimaryKey.DBName}} = $1;", key).Scan({{.SQL.IdentRefs}}); err != nil {
-		if err == sql.ErrNoRows {
-			return nil, 2, err
-		}
-		if postgresErr, ok := err.(*pq.Error); ok {
-			switch postgresErr.Code {
-			case "42P01": // undefined_table
-				return nil, 4, err
-			default:
-				return nil, 0, err
-			}
-		}
-		return nil, 0, err
-	}
-	return m, 0, nil
-}
-
 func {{.Prefix}}ModelInsert(db *sql.DB, m *{{.ModelIdent}}) (int, error) {
 	_, err := db.Exec("INSERT INTO {{.TableName}} ({{.SQL.DBNames}}) VALUES ({{.SQL.Placeholders}});", {{.SQL.Idents}})
 	if err != nil {
@@ -77,15 +58,5 @@ func {{.Prefix}}ModelInsertBulk(db *sql.DB, models []*{{.ModelIdent}}, allowConf
 		}
 	}
 	return 0, nil
-}
-
-func {{.Prefix}}ModelUpdate(db *sql.DB, m *{{.ModelIdent}}) error {
-	_, err := db.Exec("UPDATE {{.TableName}} SET ({{.SQL.DBNames}}) = ({{.SQL.Placeholders}}) WHERE {{.PrimaryKey.DBName}} = ${{.PrimaryKey.Num}};", {{.SQL.Idents}})
-	return err
-}
-
-func {{.Prefix}}ModelDelete(db *sql.DB, m *{{.ModelIdent}}) error {
-	_, err := db.Exec("DELETE FROM {{.TableName}} WHERE {{.PrimaryKey.DBName}} = $1;", m.{{.PrimaryKey.Ident}})
-	return err
 }
 `

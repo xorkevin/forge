@@ -1,6 +1,6 @@
 package model
 
-const templateDelGroupSet = `
+const templateDelSet = `
 func {{.Prefix}}ModelDelSet{{.PrimaryField.Ident}}(db *sql.DB, keys []{{.PrimaryField.GoType}}) error {
 	placeholderStart := 1
 	placeholders := make([]string, 0, len(keys))

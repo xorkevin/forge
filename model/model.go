@@ -29,9 +29,8 @@ type (
 	}
 
 	ModelDef struct {
-		Ident      string
-		Fields     []ModelField
-		PrimaryKey ModelField
+		Ident  string
+		Fields []ModelField
 	}
 
 	QueryDef struct {
@@ -76,7 +75,6 @@ type (
 		TableName  string
 		Imports    string
 		ModelIdent string
-		PrimaryKey ModelField
 		SQL        ModelSQLStrings
 	}
 
@@ -151,22 +149,22 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 		log.Fatal(err)
 	}
 
-	tplupdgroupeq, err := template.New("updgroupeq").Parse(templateUpdGroupEq)
+	tplupdeq, err := template.New("updeq").Parse(templateUpdEq)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	tplupdgroupset, err := template.New("updgroupset").Parse(templateUpdGroupSet)
+	tplupdset, err := template.New("updset").Parse(templateUpdSet)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	tpldelgroupeq, err := template.New("delgroupeq").Parse(templateDelGroupEq)
+	tpldeleq, err := template.New("deleq").Parse(templateDelEq)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	tpldelgroupset, err := template.New("delgroupset").Parse(templateDelGroupSet)
+	tpldelset, err := template.New("delset").Parse(templateDelSet)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -185,7 +183,6 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 		TableName:  tableName,
 		Imports:    deps,
 		ModelIdent: modelDef.Ident,
-		PrimaryKey: modelDef.PrimaryKey,
 		SQL:        modelDef.genModelSQL(),
 	}
 	if err := tplmodel.Execute(genFileWriter, tplData); err != nil {
@@ -235,20 +232,20 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 				}
 			case flagUpdGroupEq:
 				tplData.SQLCond = i.genQueryCondSQL(len(queryDef.Fields))
-				if err := tplupdgroupeq.Execute(genFileWriter, tplData); err != nil {
+				if err := tplupdeq.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
 			case flagUpdGroupSet:
-				if err := tplupdgroupset.Execute(genFileWriter, tplData); err != nil {
+				if err := tplupdset.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
 			case flagDelGroupEq:
 				tplData.SQLCond = i.genQueryCondSQL(0)
-				if err := tpldelgroupeq.Execute(genFileWriter, tplData); err != nil {
+				if err := tpldeleq.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
 			case flagDelGroupSet:
-				if err := tpldelgroupset.Execute(genFileWriter, tplData); err != nil {
+				if err := tpldelset.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
 			}
@@ -270,7 +267,7 @@ func parseDefinitions(gofile string, modelIdent string, queryIdents []string) (M
 		log.Fatal("No top level declarations")
 	}
 
-	modelFields, primaryField, seenFields := parseModelFields(findFields(modelTagName, findStruct(modelIdent, root.Decls), fset))
+	modelFields, seenFields := parseModelFields(findFields(modelTagName, findStruct(modelIdent, root.Decls), fset))
 
 	deps := Dependencies{}
 	queryDefs := []QueryDef{}
@@ -285,9 +282,8 @@ func parseDefinitions(gofile string, modelIdent string, queryIdents []string) (M
 	}
 
 	return ModelDef{
-		Ident:      modelIdent,
-		Fields:     modelFields,
-		PrimaryKey: primaryField,
+		Ident:  modelIdent,
+		Fields: modelFields,
 	}, queryDefs, deps.String()
 }
 
@@ -347,10 +343,7 @@ func findFields(tagName string, modelDef *ast.StructType, fset *token.FileSet) [
 	return fields
 }
 
-func parseModelFields(astfields []ASTField) ([]ModelField, ModelField, map[string]ModelField) {
-	hasPK := false
-	var primaryKey ModelField
-
+func parseModelFields(astfields []ASTField) ([]ModelField, map[string]ModelField) {
 	seenFields := map[string]ModelField{}
 
 	fields := []ModelField{}
@@ -378,21 +371,10 @@ func parseModelFields(astfields []ASTField) ([]ModelField, ModelField, map[strin
 			Num:    n + 1,
 		}
 		seenFields[dbName] = f
-		if strings.Contains(dbType, "PRIMARY KEY") {
-			if hasPK {
-				log.Fatal("Model cannot contain two primary keys")
-			}
-			hasPK = true
-			primaryKey = f
-		}
 		fields = append(fields, f)
 	}
 
-	if !hasPK {
-		log.Fatal("Model does not contain a primary key")
-	}
-
-	return fields, primaryKey, seenFields
+	return fields, seenFields
 }
 
 func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([]QueryField, []QueryField, string) {
@@ -503,13 +485,13 @@ func parseFlag(flag string) int {
 		return flagGetGroupEq
 	case "getgroupset":
 		return flagGetGroupSet
-	case "updgroupeq":
+	case "updeq":
 		return flagUpdGroupEq
-	case "updgroupset":
+	case "updset":
 		return flagUpdGroupSet
-	case "delgroupeq":
+	case "deleq":
 		return flagDelGroupEq
-	case "delgroupset":
+	case "delset":
 		return flagDelGroupSet
 	default:
 		log.Fatal("Illegal flag " + flag)
