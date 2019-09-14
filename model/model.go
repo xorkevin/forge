@@ -355,7 +355,7 @@ func parseModelFields(astfields []ASTField) ([]ModelField, ModelField, map[strin
 
 	fields := []ModelField{}
 	for n, i := range astfields {
-		tags := strings.Split(i.Tags, ",")
+		tags := strings.SplitN(i.Tags, ",", 2)
 		if len(tags) != 2 {
 			log.Fatal("Model field tag must be dbname,dbtype")
 		}
