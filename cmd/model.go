@@ -33,7 +33,7 @@ following syntax:
 
 	column_name,sql_type
 
-Field without a "model" tag are ignored.
+Fields without a "model" tag are ignored.
 
 One field must contain a sql_type with "PRIMARY KEY".
 
@@ -56,6 +56,10 @@ Valid flags are:
 		value(s) is equal to the input ordered by the field value
 	- getgroupset: (no args), gets all rows where the field value is in the input
 		set ordered by the field value
+	- updgroupeq: args(equal_field,...), updates all rows where the equal
+		fields(s) values(s) is equal to the input
+	- updgroupset: (no args), updates all rows where the field value is in the
+		input set
 	- delgroupeq: args(equal_field,...), deletes all rows where the equal
 		fields(s) values(s) is equal to the input
 	- delgroupset: (no args), deletes all rows where the field value is in the
