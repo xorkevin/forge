@@ -53,8 +53,13 @@ type (
 		DBName string
 		DBType string
 		Num    int
-		Mode   int
-		Cond   []ModelField
+		Mode   QueryFlag
+		Cond   []CondField
+	}
+
+	CondField struct {
+		Kind  CondType
+		Field ModelField
 	}
 
 	ModelSQLStrings struct {
@@ -230,21 +235,21 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 				if err := tplquerygroupset.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
-			case flagUpdGroupEq:
+			case flagUpdEq:
 				tplData.SQLCond = i.genQueryCondSQL(len(queryDef.Fields))
 				if err := tplupdeq.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
-			case flagUpdGroupSet:
+			case flagUpdSet:
 				if err := tplupdset.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
-			case flagDelGroupEq:
+			case flagDelEq:
 				tplData.SQLCond = i.genQueryCondSQL(0)
 				if err := tpldeleq.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
-			case flagDelGroupSet:
+			case flagDelSet:
 				if err := tpldelset.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
@@ -412,36 +417,45 @@ func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([
 					if len(tags) < 2 {
 						log.Fatal("Field tag must be dbname,flag,eqcond,... for field " + i.Ident)
 					}
-					k := make([]ModelField, 0, len(tags[1:]))
+					k := make([]CondField, 0, len(tags[1:]))
 					for _, cond := range tags[1:] {
 						if modelField, ok := seenFields[cond]; ok {
-							k = append(k, modelField)
+							k = append(k, CondField{
+								Kind:  condBase,
+								Field: modelField,
+							})
 						} else {
 							log.Fatal("Invalid eq condition field for field " + i.Ident)
 						}
 					}
 					f.Cond = k
-				case flagUpdGroupEq:
+				case flagUpdEq:
 					if len(tags) < 2 {
 						log.Fatal("Field tag must be dbname,flag,eqcond,... for field " + i.Ident)
 					}
-					k := make([]ModelField, 0, len(tags[1:]))
+					k := make([]CondField, 0, len(tags[1:]))
 					for _, cond := range tags[1:] {
 						if modelField, ok := seenFields[cond]; ok {
-							k = append(k, modelField)
+							k = append(k, CondField{
+								Kind:  condBase,
+								Field: modelField,
+							})
 						} else {
 							log.Fatal("Invalid eq condition field for field " + i.Ident)
 						}
 					}
 					f.Cond = k
-				case flagDelGroupEq:
+				case flagDelEq:
 					if len(tags) < 2 {
 						log.Fatal("Field tag must be dbname,flag,eqcond,... for field " + i.Ident)
 					}
-					k := make([]ModelField, 0, len(tags[1:]))
+					k := make([]CondField, 0, len(tags[1:]))
 					for _, cond := range tags[1:] {
 						if modelField, ok := seenFields[cond]; ok {
-							k = append(k, modelField)
+							k = append(k, CondField{
+								Kind:  condBase,
+								Field: modelField,
+							})
 						} else {
 							log.Fatal("Invalid eq condition field for field " + i.Ident)
 						}
@@ -464,18 +478,22 @@ func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([
 	return fields, queryFields, deps.String()
 }
 
+type (
+	QueryFlag int
+)
+
 const (
-	flagGet = iota
+	flagGet QueryFlag = iota
 	flagGetGroup
 	flagGetGroupEq
 	flagGetGroupSet
-	flagUpdGroupEq
-	flagUpdGroupSet
-	flagDelGroupEq
-	flagDelGroupSet
+	flagUpdEq
+	flagUpdSet
+	flagDelEq
+	flagDelSet
 )
 
-func parseFlag(flag string) int {
+func parseFlag(flag string) QueryFlag {
 	switch flag {
 	case "get":
 		return flagGet
@@ -486,18 +504,27 @@ func parseFlag(flag string) int {
 	case "getgroupset":
 		return flagGetGroupSet
 	case "updeq":
-		return flagUpdGroupEq
+		return flagUpdEq
 	case "updset":
-		return flagUpdGroupSet
+		return flagUpdSet
 	case "deleq":
-		return flagDelGroupEq
+		return flagDelEq
 	case "delset":
-		return flagDelGroupSet
+		return flagDelSet
 	default:
 		log.Fatal("Illegal flag " + flag)
 	}
 	return -1
 }
+
+type (
+	CondType int
+)
+
+const (
+	condBase CondType = iota
+	condArr
+)
 
 func dbTypeIsArray(dbType string) bool {
 	return strings.Contains(dbType, "ARRAY")
@@ -577,11 +604,11 @@ func (q *QueryField) genQueryCondSQL(offset int) QueryCondSQLStrings {
 	sqlIdentNames := make([]string, 0, len(q.Cond))
 	placeholderStart := 1
 	for n, i := range q.Cond {
-		paramName := strings.ToLower(i.Ident)
-		sqlDBCond = append(sqlDBCond, fmt.Sprintf("%s = $%d", i.DBName, n+offset+placeholderStart))
-		sqlIdentParams = append(sqlIdentParams, fmt.Sprintf("%s %s", paramName, i.GoType))
+		paramName := strings.ToLower(i.Field.Ident)
+		sqlDBCond = append(sqlDBCond, fmt.Sprintf("%s = $%d", i.Field.DBName, n+offset+placeholderStart))
+		sqlIdentParams = append(sqlIdentParams, fmt.Sprintf("%s %s", paramName, i.Field.GoType))
 		sqlIdentArgs = append(sqlIdentArgs, paramName)
-		sqlIdentNames = append(sqlIdentNames, i.Ident)
+		sqlIdentNames = append(sqlIdentNames, i.Field.Ident)
 	}
 	return QueryCondSQLStrings{
 		DBCond:      strings.Join(sqlDBCond, " AND "),
