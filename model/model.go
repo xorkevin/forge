@@ -419,10 +419,11 @@ func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([
 					}
 					k := make([]CondField, 0, len(tags[1:]))
 					for _, cond := range tags[1:] {
-						if modelField, ok := seenFields[cond]; ok {
+						condName, kind := parseCondField(cond)
+						if field, ok := seenFields[condName]; ok {
 							k = append(k, CondField{
-								Kind:  condBase,
-								Field: modelField,
+								Kind:  kind,
+								Field: field,
 							})
 						} else {
 							log.Fatal("Invalid eq condition field for field " + i.Ident)
@@ -435,10 +436,11 @@ func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([
 					}
 					k := make([]CondField, 0, len(tags[1:]))
 					for _, cond := range tags[1:] {
-						if modelField, ok := seenFields[cond]; ok {
+						condName, kind := parseCondField(cond)
+						if field, ok := seenFields[condName]; ok {
 							k = append(k, CondField{
-								Kind:  condBase,
-								Field: modelField,
+								Kind:  kind,
+								Field: field,
 							})
 						} else {
 							log.Fatal("Invalid eq condition field for field " + i.Ident)
@@ -451,10 +453,11 @@ func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([
 					}
 					k := make([]CondField, 0, len(tags[1:]))
 					for _, cond := range tags[1:] {
-						if modelField, ok := seenFields[cond]; ok {
+						condName, kind := parseCondField(cond)
+						if field, ok := seenFields[condName]; ok {
 							k = append(k, CondField{
-								Kind:  condBase,
-								Field: modelField,
+								Kind:  kind,
+								Field: field,
 							})
 						} else {
 							log.Fatal("Invalid eq condition field for field " + i.Ident)
@@ -525,6 +528,24 @@ const (
 	condBase CondType = iota
 	condArr
 )
+
+func parseCondField(field string) (string, CondType) {
+	k := strings.SplitN(field, "|", 2)
+	if len(k) == 2 {
+		return k[0], parseCond(k[1])
+	}
+	return field, condBase
+}
+
+func parseCond(cond string) CondType {
+	switch cond {
+	case "arr":
+		return condArr
+	default:
+		log.Fatal("Illegal cond type " + cond)
+	}
+	return -1
+}
 
 func dbTypeIsArray(dbType string) bool {
 	return strings.Contains(dbType, "ARRAY")
