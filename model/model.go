@@ -637,7 +637,7 @@ func (q *QueryField) genQueryCondSQL(offset int) QueryCondSQLStrings {
 		identName := i.Field.Ident
 		if i.Kind == condArr {
 			paramType = "[]" + paramType
-			identName = "In" + identName
+			identName = "Has" + identName
 		}
 
 		if i.Kind == condArr {
