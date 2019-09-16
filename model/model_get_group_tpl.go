@@ -1,6 +1,6 @@
 package model
 
-const templateQueryGroup = `
+const templateGetGroup = `
 func {{.Prefix}}ModelGet{{.ModelIdent}}Ord{{.PrimaryField.Ident}}(db *sql.DB, orderasc bool, limit, offset int) ([]{{.ModelIdent}}, error) {
 	order := "DESC"
 	if orderasc {

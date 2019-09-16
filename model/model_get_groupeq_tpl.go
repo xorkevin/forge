@@ -1,6 +1,6 @@
 package model
 
-const templateQueryGroupEq = `
+const templateGetGroupEq = `
 func {{.Prefix}}ModelGet{{.ModelIdent}}Eq{{.SQLCond.IdentNames}}Ord{{.PrimaryField.Ident}}(db *sql.DB, {{.SQLCond.IdentParams}}, orderasc bool, limit, offset int) ([]{{.ModelIdent}}, error) {
 	order := "DESC"
 	if orderasc {

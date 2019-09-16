@@ -1,6 +1,6 @@
 package model
 
-const templateQueryGroupSet = `
+const templateGetGroupSet = `
 func {{.Prefix}}ModelGet{{.ModelIdent}}Set{{.PrimaryField.Ident}}(db *sql.DB, keys []{{.PrimaryField.GoType}}) ([]{{.ModelIdent}}, error) {
 	placeholderStart := 1
 	placeholders := make([]string, 0, len(keys))

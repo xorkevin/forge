@@ -1,6 +1,6 @@
 package model
 
-const templateQuerySingle = `
+const templateGetSingle = `
 func {{.Prefix}}ModelGet{{.ModelIdent}}By{{.PrimaryField.Ident}}(db *sql.DB, key {{.PrimaryField.GoType}}) (*{{.ModelIdent}}, int, error) {
 	m := &{{.ModelIdent}}{}
 	if err := db.QueryRow("SELECT {{.SQL.DBNames}} FROM {{.TableName}} WHERE {{.PrimaryField.DBName}} = $1;", key).Scan({{.SQL.IdentRefs}}); err != nil {

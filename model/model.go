@@ -137,22 +137,22 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 		log.Fatal(err)
 	}
 
-	tplquery, err := template.New("querysingle").Parse(templateQuerySingle)
+	tplget, err := template.New("getsingle").Parse(templateGetSingle)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	tplquerygroup, err := template.New("querygroup").Parse(templateQueryGroup)
+	tplgetgroup, err := template.New("getgroup").Parse(templateGetGroup)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	tplquerygroupeq, err := template.New("groupeq").Parse(templateQueryGroupEq)
+	tplgetgroupeq, err := template.New("getgroupeq").Parse(templateGetGroupEq)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	tplquerygroupset, err := template.New("groupset").Parse(templateQueryGroupSet)
+	tplgetgroupset, err := template.New("getgroupset").Parse(templateGetGroupSet)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -222,20 +222,20 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 			}
 			switch i.Mode {
 			case flagGet:
-				if err := tplquery.Execute(genFileWriter, tplData); err != nil {
+				if err := tplget.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
 			case flagGetGroup:
-				if err := tplquerygroup.Execute(genFileWriter, tplData); err != nil {
+				if err := tplgetgroup.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
 			case flagGetGroupEq:
 				tplData.SQLCond = i.genQueryCondSQL(2)
-				if err := tplquerygroupeq.Execute(genFileWriter, tplData); err != nil {
+				if err := tplgetgroupeq.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
 			case flagGetGroupSet:
-				if err := tplquerygroupset.Execute(genFileWriter, tplData); err != nil {
+				if err := tplgetgroupset.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
 			case flagUpdEq:
