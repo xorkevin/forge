@@ -92,10 +92,13 @@ type (
 	}
 
 	QueryCondSQLStrings struct {
-		DBCond      string
-		IdentParams string
-		IdentArgs   string
-		IdentNames  string
+		DBCond          string
+		IdentParams     string
+		IdentArgs       string
+		ArrIdentArgs    []string
+		ArrIdentArgsLen string
+		IdentNames      string
+		ParamCount      int
 	}
 
 	QueryTemplateData struct {
@@ -623,9 +626,10 @@ func (q *QueryField) genQueryCondSQL(offset int) QueryCondSQLStrings {
 	sqlIdentParams := make([]string, 0, len(q.Cond))
 	sqlIdentArgs := make([]string, 0, len(q.Cond))
 	sqlArrIdentArgs := make([]string, 0, len(q.Cond))
+	sqlArrIdentArgsLen := make([]string, 0, len(q.Cond))
 	sqlIdentNames := make([]string, 0, len(q.Cond))
 	placeholderStart := 1
-	paramCount := 0
+	paramCount := offset
 	for _, i := range q.Cond {
 		paramName := strings.ToLower(i.Field.Ident)
 		dbName := i.Field.DBName
@@ -637,10 +641,11 @@ func (q *QueryField) genQueryCondSQL(offset int) QueryCondSQLStrings {
 		}
 
 		if i.Kind == condArr {
-			sqlDBCond = append(sqlDBCond, fmt.Sprintf(`%s IN (VALUES "+strings.Join(placeholders%s, ", ")+")`, dbName, paramName))
+			sqlDBCond = append(sqlDBCond, fmt.Sprintf(`%s IN (VALUES "+placeholders%s+")`, dbName, paramName))
 			sqlArrIdentArgs = append(sqlArrIdentArgs, paramName)
+			sqlArrIdentArgsLen = append(sqlArrIdentArgsLen, fmt.Sprintf("len(%s)", paramName))
 		} else {
-			sqlDBCond = append(sqlDBCond, fmt.Sprintf("%s = $%d", dbName, paramCount+offset+placeholderStart))
+			sqlDBCond = append(sqlDBCond, fmt.Sprintf("%s = $%d", dbName, paramCount+placeholderStart))
 			sqlIdentArgs = append(sqlIdentArgs, paramName)
 			paramCount++
 		}
@@ -648,10 +653,13 @@ func (q *QueryField) genQueryCondSQL(offset int) QueryCondSQLStrings {
 		sqlIdentNames = append(sqlIdentNames, identName)
 	}
 	return QueryCondSQLStrings{
-		DBCond:      strings.Join(sqlDBCond, " AND "),
-		IdentParams: strings.Join(sqlIdentParams, ", "),
-		IdentArgs:   strings.Join(sqlIdentArgs, ", "),
-		IdentNames:  strings.Join(sqlIdentNames, ""),
+		DBCond:          strings.Join(sqlDBCond, " AND "),
+		IdentParams:     strings.Join(sqlIdentParams, ", "),
+		IdentArgs:       strings.Join(sqlIdentArgs, ", "),
+		ArrIdentArgs:    sqlArrIdentArgs,
+		ArrIdentArgsLen: strings.Join(sqlArrIdentArgsLen, "+"),
+		IdentNames:      strings.Join(sqlIdentNames, ""),
+		ParamCount:      paramCount,
 	}
 }
 
