@@ -622,14 +622,30 @@ func (q *QueryField) genQueryCondSQL(offset int) QueryCondSQLStrings {
 	sqlDBCond := make([]string, 0, len(q.Cond))
 	sqlIdentParams := make([]string, 0, len(q.Cond))
 	sqlIdentArgs := make([]string, 0, len(q.Cond))
+	sqlArrIdentArgs := make([]string, 0, len(q.Cond))
 	sqlIdentNames := make([]string, 0, len(q.Cond))
 	placeholderStart := 1
-	for n, i := range q.Cond {
+	paramCount := 0
+	for _, i := range q.Cond {
 		paramName := strings.ToLower(i.Field.Ident)
-		sqlDBCond = append(sqlDBCond, fmt.Sprintf("%s = $%d", i.Field.DBName, n+offset+placeholderStart))
-		sqlIdentParams = append(sqlIdentParams, fmt.Sprintf("%s %s", paramName, i.Field.GoType))
-		sqlIdentArgs = append(sqlIdentArgs, paramName)
-		sqlIdentNames = append(sqlIdentNames, i.Field.Ident)
+		dbName := i.Field.DBName
+		paramType := i.Field.GoType
+		identName := i.Field.Ident
+		if i.Kind == condArr {
+			paramType = "[]" + paramType
+			identName = "In" + identName
+		}
+
+		if i.Kind == condArr {
+			sqlDBCond = append(sqlDBCond, fmt.Sprintf(`%s IN (VALUES "+strings.Join(placeholders%s, ", ")+")`, dbName, paramName))
+			sqlArrIdentArgs = append(sqlArrIdentArgs, paramName)
+		} else {
+			sqlDBCond = append(sqlDBCond, fmt.Sprintf("%s = $%d", dbName, paramCount+offset+placeholderStart))
+			sqlIdentArgs = append(sqlIdentArgs, paramName)
+			paramCount++
+		}
+		sqlIdentParams = append(sqlIdentParams, fmt.Sprintf("%s %s", paramName, paramType))
+		sqlIdentNames = append(sqlIdentNames, identName)
 	}
 	return QueryCondSQLStrings{
 		DBCond:      strings.Join(sqlDBCond, " AND "),
