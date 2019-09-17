@@ -545,6 +545,11 @@ func (m *ModelDef) genModelSQL() ModelSQLStrings {
 		}
 	}
 
+	sqlIndicies := make([]string, 0, len(m.Indexed))
+	for _, i := range m.Indexed {
+		sqlIndicies = append(sqlIndicies, i.DBName)
+	}
+
 	return ModelSQLStrings{
 		Setup:            strings.Join(sqlDefs, ", "),
 		DBNames:          strings.Join(sqlDBNames, ", "),

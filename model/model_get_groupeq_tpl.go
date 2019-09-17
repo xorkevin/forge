@@ -5,9 +5,7 @@ func {{.Prefix}}ModelGet{{.ModelIdent}}Eq{{.SQLCond.IdentNames}}Ord{{.PrimaryFie
 	{{- if .SQLCond.ArrIdentArgs }}
 	paramCount := {{.SQLCond.ParamCount}}
 	args := make([]interface{}, 0, paramCount{{with .SQLCond.ArrIdentArgsLen}}+{{.}}{{end}})
-	{{- if .SQLCond.IdentArgs }}
-	args = append(args, {{.SQLCond.IdentArgs}})
-	{{- end }}
+	args = append(args, limit, offset{{if .SQLCond.IdentArgs}}{{.SQLCond.IdentArgs}}{{end}})
 	{{- end }}
 	{{- range .SQLCond.ArrIdentArgs }}
 	var placeholders{{.}} string
@@ -26,7 +24,7 @@ func {{.Prefix}}ModelGet{{.ModelIdent}}Eq{{.SQLCond.IdentNames}}Ord{{.PrimaryFie
 		order = "ASC"
 	}
 	res := make([]{{.ModelIdent}}, 0, limit)
-	rows, err := db.Query("SELECT {{.SQL.DBNames}} FROM {{.TableName}} WHERE {{.SQLCond.DBCond}} ORDER BY {{.PrimaryField.DBName}} "+order+" LIMIT $1 OFFSET $2;", limit, offset, {{if .SQLCond.ArrIdentArgs}}args{{else}}{{.SQLCond.IdentArgs}}{{end}})
+	rows, err := db.Query("SELECT {{.SQL.DBNames}} FROM {{.TableName}} WHERE {{.SQLCond.DBCond}} ORDER BY {{.PrimaryField.DBName}} "+order+" LIMIT $1 OFFSET $2;", {{if .SQLCond.ArrIdentArgs}}args...{{else}}limit, offset, {{.SQLCond.IdentArgs}}{{end}})
 	if err != nil {
 		return nil, err
 	}

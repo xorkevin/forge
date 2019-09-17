@@ -20,7 +20,7 @@ func {{.Prefix}}ModelGet{{.ModelIdent}}Eq{{.SQLCond.IdentNames}}(db *sql.DB, {{.
 	}
 	{{- end }}
 	m := &{{.ModelIdent}}{}
-	if err := db.QueryRow("SELECT {{.SQL.DBNames}} FROM {{.TableName}} WHERE {{.SQLCond.DBCond}};", {{if .SQLCond.ArrIdentArgs}}args{{else}}{{.SQLCond.IdentArgs}}{{end}}).Scan({{.SQL.IdentRefs}}); err != nil {
+	if err := db.QueryRow("SELECT {{.SQL.DBNames}} FROM {{.TableName}} WHERE {{.SQLCond.DBCond}};", {{if .SQLCond.ArrIdentArgs}}args...{{else}}{{.SQLCond.IdentArgs}}{{end}}).Scan({{.SQL.IdentRefs}}); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, 2, err
 		}

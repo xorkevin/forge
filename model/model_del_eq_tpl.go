@@ -21,7 +21,7 @@ func {{.Prefix}}ModelDelEq{{.SQLCond.IdentNames}}(db *sql.DB, {{.SQLCond.IdentPa
 		placeholders{{.}} = strings.Join(placeholders, ", ")
 	}
 	{{- end }}
-	_, err := db.Exec("DELETE FROM {{.TableName}} WHERE {{.SQLCond.DBCond}};", {{if .SQLCond.ArrIdentArgs}}args{{else}}{{.SQLCond.IdentArgs}}{{end}})
+	_, err := db.Exec("DELETE FROM {{.TableName}} WHERE {{.SQLCond.DBCond}};", {{if .SQLCond.ArrIdentArgs}}args...{{else}}{{.SQLCond.IdentArgs}}{{end}})
 	return err
 }
 `
