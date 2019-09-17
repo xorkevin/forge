@@ -153,27 +153,12 @@ func Execute(verbose bool, version, generatedFilepath, prefix, tableName, modelI
 		log.Fatal(err)
 	}
 
-	tplgetgroupset, err := template.New("getgroupset").Parse(templateGetGroupSet)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	tplupdeq, err := template.New("updeq").Parse(templateUpdEq)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	tplupdset, err := template.New("updset").Parse(templateUpdSet)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	tpldeleq, err := template.New("deleq").Parse(templateDelEq)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	tpldelset, err := template.New("delset").Parse(templateDelSet)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -237,26 +222,14 @@ func Execute(verbose bool, version, generatedFilepath, prefix, tableName, modelI
 				if err := tplgetgroupeq.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
-			case flagGetGroupSet:
-				if err := tplgetgroupset.Execute(genFileWriter, tplData); err != nil {
-					log.Fatal(err)
-				}
 			case flagUpdEq:
 				tplData.SQLCond = i.genQueryCondSQL(len(queryDef.Fields))
 				if err := tplupdeq.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
-			case flagUpdSet:
-				if err := tplupdset.Execute(genFileWriter, tplData); err != nil {
-					log.Fatal(err)
-				}
 			case flagDelEq:
 				tplData.SQLCond = i.genQueryCondSQL(0)
 				if err := tpldeleq.Execute(genFileWriter, tplData); err != nil {
-					log.Fatal(err)
-				}
-			case flagDelSet:
-				if err := tpldelset.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
 			}
@@ -476,16 +449,10 @@ func parseFlag(flag string) QueryFlag {
 		return flagGetGroup
 	case "getgroupeq":
 		return flagGetGroupEq
-	case "getgroupset":
-		return flagGetGroupSet
 	case "updeq":
 		return flagUpdEq
-	case "updset":
-		return flagUpdSet
 	case "deleq":
 		return flagDelEq
-	case "delset":
-		return flagDelSet
 	default:
 		log.Fatal("Illegal flag " + flag)
 	}
@@ -597,7 +564,6 @@ func (q *QueryField) genQueryCondSQL(offset int) QueryCondSQLStrings {
 	sqlArrIdentArgs := make([]string, 0, len(q.Cond))
 	sqlArrIdentArgsLen := make([]string, 0, len(q.Cond))
 	sqlIdentNames := make([]string, 0, len(q.Cond))
-	placeholderStart := 1
 	paramCount := offset
 	for _, i := range q.Cond {
 		paramName := strings.ToLower(i.Field.Ident)
@@ -614,9 +580,9 @@ func (q *QueryField) genQueryCondSQL(offset int) QueryCondSQLStrings {
 			sqlArrIdentArgs = append(sqlArrIdentArgs, paramName)
 			sqlArrIdentArgsLen = append(sqlArrIdentArgsLen, fmt.Sprintf("len(%s)", paramName))
 		} else {
-			sqlDBCond = append(sqlDBCond, fmt.Sprintf("%s = $%d", dbName, paramCount+placeholderStart))
-			sqlIdentArgs = append(sqlIdentArgs, paramName)
 			paramCount++
+			sqlDBCond = append(sqlDBCond, fmt.Sprintf("%s = $%d", dbName, paramCount))
+			sqlIdentArgs = append(sqlIdentArgs, paramName)
 		}
 		sqlIdentParams = append(sqlIdentParams, fmt.Sprintf("%s %s", paramName, paramType))
 		sqlIdentNames = append(sqlIdentNames, identName)
