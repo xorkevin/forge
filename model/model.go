@@ -29,8 +29,9 @@ type (
 	}
 
 	ModelDef struct {
-		Ident  string
-		Fields []ModelField
+		Ident   string
+		Fields  []ModelField
+		Indexed []ModelField
 	}
 
 	QueryDef struct {
@@ -251,7 +252,7 @@ func parseDefinitions(gofile string, modelIdent string, queryIdents []string) (M
 		log.Fatal("No top level declarations")
 	}
 
-	modelFields, seenFields := parseModelFields(findFields(modelTagName, findStruct(modelIdent, root.Decls), fset))
+	modelFields, seenFields, indexedFields := parseModelFields(findFields(modelTagName, findStruct(modelIdent, root.Decls), fset))
 
 	deps := Dependencies{}
 	queryDefs := []QueryDef{}
@@ -266,8 +267,9 @@ func parseDefinitions(gofile string, modelIdent string, queryIdents []string) (M
 	}
 
 	return ModelDef{
-		Ident:  modelIdent,
-		Fields: modelFields,
+		Ident:   modelIdent,
+		Fields:  modelFields,
+		Indexed: indexedFields,
 	}, queryDefs, deps.String()
 }
 
@@ -327,17 +329,19 @@ func findFields(tagName string, modelDef *ast.StructType, fset *token.FileSet) [
 	return fields
 }
 
-func parseModelFields(astfields []ASTField) ([]ModelField, map[string]ModelField) {
+func parseModelFields(astfields []ASTField) ([]ModelField, map[string]ModelField, []ModelField) {
 	seenFields := map[string]ModelField{}
+	indexedFields := []ModelField{}
 
 	fields := []ModelField{}
 	for n, i := range astfields {
 		tags := strings.SplitN(i.Tags, ",", 2)
-		if len(tags) != 2 {
-			log.Fatal("Model field tag must be dbname,dbtype")
+		if len(tags) < 2 {
+			log.Fatal("Model field tag must be dbname,dbtype[;index]")
 		}
 		dbName := tags[0]
-		dbType := tags[1]
+		opts := strings.Split(tags[1], ";")
+		dbType := opts[0]
 		if len(dbName) == 0 {
 			log.Fatal(i.Ident + " dbname not set")
 		}
@@ -354,11 +358,18 @@ func parseModelFields(astfields []ASTField) ([]ModelField, map[string]ModelField
 			DBType: dbType,
 			Num:    n + 1,
 		}
+		for _, i := range opts[1:] {
+			opt := parseModelOpt(i)
+			switch opt {
+			case optIndex:
+				indexedFields = append(indexedFields, f)
+			}
+		}
 		seenFields[dbName] = f
 		fields = append(fields, f)
 	}
 
-	return fields, seenFields
+	return fields, seenFields, indexedFields
 }
 
 func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([]QueryField, []QueryField, string) {
@@ -424,6 +435,24 @@ func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([
 	}
 
 	return fields, queryFields, deps.String()
+}
+
+type (
+	ModelOpt int
+)
+
+const (
+	optIndex ModelOpt = iota
+)
+
+func parseModelOpt(opt string) ModelOpt {
+	switch opt {
+	case "index":
+		return optIndex
+	default:
+		log.Fatal("Illegal opt " + opt)
+	}
+	return -1
 }
 
 type (
