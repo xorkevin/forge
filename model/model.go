@@ -75,6 +75,7 @@ type (
 
 	ModelTemplateData struct {
 		Generator  string
+		Version    string
 		Package    string
 		Prefix     string
 		TableName  string
@@ -111,7 +112,7 @@ type (
 	}
 )
 
-func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent string, queryIdents []string) {
+func Execute(verbose bool, version, generatedFilepath, prefix, tableName, modelIdent string, queryIdents []string) {
 	gopackage := os.Getenv("GOPACKAGE")
 	if len(gopackage) == 0 {
 		log.Fatal("Environment variable GOPACKAGE not provided by go generate")
@@ -186,6 +187,7 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 
 	tplData := ModelTemplateData{
 		Generator:  "go generate forge model",
+		Version:    version,
 		Package:    gopackage,
 		Prefix:     prefix,
 		TableName:  tableName,

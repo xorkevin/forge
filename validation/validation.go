@@ -40,6 +40,7 @@ type (
 
 	MainTemplateData struct {
 		Generator string
+		Version   string
 		Package   string
 	}
 
@@ -52,7 +53,7 @@ type (
 	}
 )
 
-func Execute(verbose bool, generatedFilepath, prefix, prefixValid, prefixHas string, validationIdents []string) {
+func Execute(verbose bool, version, generatedFilepath, prefix, prefixValid, prefixHas string, validationIdents []string) {
 	gopackage := os.Getenv("GOPACKAGE")
 	if len(gopackage) == 0 {
 		log.Fatal("Environment variable GOPACKAGE not provided by go generate")
@@ -90,6 +91,7 @@ func Execute(verbose bool, generatedFilepath, prefix, prefixValid, prefixHas str
 
 	tplData := MainTemplateData{
 		Generator: "go generate forge validation",
+		Version:   version,
 		Package:   gopackage,
 	}
 	if err := tplmain.Execute(genFileWriter, tplData); err != nil {

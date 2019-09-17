@@ -9,6 +9,10 @@ import (
 	"github.com/spf13/viper"
 )
 
+const (
+	versionString = "v0.1.0"
+)
+
 var cfgFile string
 
 // rootCmd represents the base command when called without any subcommands
@@ -17,7 +21,7 @@ var rootCmd = &cobra.Command{
 	Short: "A code generation utility",
 	Long: `A code generation utility for governor to generate common files instead
 of writing them by hand.`,
-	Version: "v0.1.0",
+	Version: versionString,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	//	Run: func(cmd *cobra.Command, args []string) { },

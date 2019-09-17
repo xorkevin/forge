@@ -64,7 +64,7 @@ Valid flags are:
 		input set
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		model.Execute(modelVerbose, modelOutputFile, modelOutputPrefix, modelTableName, modelModelName, args)
+		model.Execute(modelVerbose, versionString, modelOutputFile, modelOutputPrefix, modelTableName, modelModelName, args)
 	},
 }
 

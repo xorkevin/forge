@@ -19,7 +19,7 @@ var validationCmd = &cobra.Command{
 	Short: "Generates validations",
 	Long:  `Generates common validation on go structs`,
 	Run: func(cmd *cobra.Command, args []string) {
-		validation.Execute(validationVerbose, validationOutputFile, validationOutputPrefix, validationValidatePrefix, validationHasPrefix, args)
+		validation.Execute(validationVerbose, versionString, validationOutputFile, validationOutputPrefix, validationValidatePrefix, validationHasPrefix, args)
 	},
 }
 
