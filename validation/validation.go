@@ -89,7 +89,7 @@ func Execute(verbose bool, generatedFilepath, prefix, prefixValid, prefixHas str
 	genFileWriter := bufio.NewWriter(genfile)
 
 	tplData := MainTemplateData{
-		Generator: "go generate",
+		Generator: "go generate forge validation",
 		Package:   gopackage,
 	}
 	if err := tplmain.Execute(genFileWriter, tplData); err != nil {

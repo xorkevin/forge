@@ -137,7 +137,7 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 		log.Fatal(err)
 	}
 
-	tplget, err := template.New("getsingle").Parse(templateGetSingle)
+	tplgetoneeq, err := template.New("getoneeq").Parse(templateGetOneEq)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -185,7 +185,7 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 	genFileWriter := bufio.NewWriter(genfile)
 
 	tplData := ModelTemplateData{
-		Generator:  "go generate",
+		Generator:  "go generate forge model",
 		Package:    gopackage,
 		Prefix:     prefix,
 		TableName:  tableName,
@@ -221,8 +221,9 @@ func Execute(verbose bool, generatedFilepath, prefix, tableName, modelIdent stri
 				SQL:          querySQLStrings,
 			}
 			switch i.Mode {
-			case flagGet:
-				if err := tplget.Execute(genFileWriter, tplData); err != nil {
+			case flagGetOneEq:
+				tplData.SQLCond = i.genQueryCondSQL(0)
+				if err := tplgetoneeq.Execute(genFileWriter, tplData); err != nil {
 					log.Fatal(err)
 				}
 			case flagGetGroup:
@@ -416,41 +417,7 @@ func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([
 				tagflag := parseFlag(tags[0])
 				f.Mode = tagflag
 				switch tagflag {
-				case flagGetGroupEq:
-					if len(tags) < 2 {
-						log.Fatal("Field tag must be dbname,flag,eqcond,... for field " + i.Ident)
-					}
-					k := make([]CondField, 0, len(tags[1:]))
-					for _, cond := range tags[1:] {
-						condName, kind := parseCondField(cond)
-						if field, ok := seenFields[condName]; ok {
-							k = append(k, CondField{
-								Kind:  kind,
-								Field: field,
-							})
-						} else {
-							log.Fatal("Invalid eq condition field for field " + i.Ident)
-						}
-					}
-					f.Cond = k
-				case flagUpdEq:
-					if len(tags) < 2 {
-						log.Fatal("Field tag must be dbname,flag,eqcond,... for field " + i.Ident)
-					}
-					k := make([]CondField, 0, len(tags[1:]))
-					for _, cond := range tags[1:] {
-						condName, kind := parseCondField(cond)
-						if field, ok := seenFields[condName]; ok {
-							k = append(k, CondField{
-								Kind:  kind,
-								Field: field,
-							})
-						} else {
-							log.Fatal("Invalid eq condition field for field " + i.Ident)
-						}
-					}
-					f.Cond = k
-				case flagDelEq:
+				case flagGetOneEq, flagGetGroupEq, flagUpdEq, flagDelEq:
 					if len(tags) < 2 {
 						log.Fatal("Field tag must be dbname,flag,eqcond,... for field " + i.Ident)
 					}
@@ -489,7 +456,7 @@ type (
 )
 
 const (
-	flagGet QueryFlag = iota
+	flagGetOneEq QueryFlag = iota
 	flagGetGroup
 	flagGetGroupEq
 	flagGetGroupSet
@@ -501,8 +468,8 @@ const (
 
 func parseFlag(flag string) QueryFlag {
 	switch flag {
-	case "get":
-		return flagGet
+	case "getoneeq":
+		return flagGetOneEq
 	case "getgroup":
 		return flagGetGroup
 	case "getgroupeq":
