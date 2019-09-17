@@ -5,7 +5,9 @@ func {{.Prefix}}ModelDelEq{{.SQLCond.IdentNames}}(db *sql.DB, {{.SQLCond.IdentPa
 	{{- if .SQLCond.ArrIdentArgs }}
 	paramCount := {{.SQLCond.ParamCount}}
 	args := make([]interface{}, 0, paramCount{{with .SQLCond.ArrIdentArgsLen}}+{{.}}{{end}})
+	{{- if .SQLCond.IdentArgs }}
 	args = append(args, {{.SQLCond.IdentArgs}})
+	{{- end }}
 	{{- end }}
 	{{- range .SQLCond.ArrIdentArgs }}
 	var placeholders{{.}} string

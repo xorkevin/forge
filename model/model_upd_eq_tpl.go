@@ -5,7 +5,7 @@ func {{.Prefix}}ModelUpdate{{.ModelIdent}}Eq{{.SQLCond.IdentNames}}(db *sql.DB, 
 	{{- if .SQLCond.ArrIdentArgs }}
 	paramCount := {{.SQLCond.ParamCount}}
 	args := make([]interface{}, 0, paramCount{{with .SQLCond.ArrIdentArgsLen}}+{{.}}{{end}})
-	args = append(args, {{.SQL.Idents}}, {{.SQLCond.IdentArgs}})
+	args = append(args, {{.SQL.Idents}}{{if .SQLCond.IdentArgs}}, {{.SQLCond.IdentArgs}}{{end}})
 	{{- end }}
 	{{- range .SQLCond.ArrIdentArgs }}
 	var placeholders{{.}} string
