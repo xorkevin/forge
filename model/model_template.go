@@ -16,7 +16,16 @@ const (
 
 func {{.Prefix}}ModelSetup(db *sql.DB) error {
 	_, err := db.Exec("CREATE TABLE IF NOT EXISTS {{.TableName}} ({{.SQL.Setup}});")
-	return err
+	if err != nil {
+		return err
+	}
+	{{- range .SQL.Indicies }}
+	_, err := db.Exec("CREATE INDEX IF NOT EXISTS {{$.TableName}}_{{.}}_index ON {{$.TableName}} ({{.}});")
+	if err != nil {
+		return err
+	}
+	{{- end }}
+	return nil
 }
 
 func {{.Prefix}}ModelInsert(db *sql.DB, m *{{.ModelIdent}}) (int, error) {

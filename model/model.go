@@ -71,6 +71,7 @@ type (
 		PlaceholderCount string
 		Idents           string
 		IdentRefs        string
+		Indicies         []string
 		ColNum           string
 	}
 
@@ -558,6 +559,7 @@ func (m *ModelDef) genModelSQL() ModelSQLStrings {
 		PlaceholderCount: strings.Join(sqlPlaceholderCount, ", "),
 		Idents:           strings.Join(sqlIdents, ", "),
 		IdentRefs:        strings.Join(sqlIdentRefs, ", "),
+		Indicies:         sqlIndicies,
 		ColNum:           fmt.Sprintf("%d", colNum),
 	}
 }
