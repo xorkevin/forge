@@ -20,7 +20,7 @@ func {{.Prefix}}ModelSetup(db *sql.DB) error {
 		return err
 	}
 	{{- range .SQL.Indicies }}
-	_, err := db.Exec("CREATE INDEX IF NOT EXISTS {{$.TableName}}_{{.}}_index ON {{$.TableName}} ({{.}});")
+	_, err = db.Exec("CREATE INDEX IF NOT EXISTS {{$.TableName}}_{{.}}_index ON {{$.TableName}} ({{.}});")
 	if err != nil {
 		return err
 	}
