@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	versionString = "v0.2.0"
+	versionString = "v0.2"
 )
 
 var cfgFile string
