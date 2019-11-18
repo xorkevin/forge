@@ -494,7 +494,12 @@ type (
 )
 
 const (
-	condBase CondType = iota
+	condEq CondType = iota
+	condNeq
+	condLt
+	condLeq
+	condGt
+	condGeq
 	condArr
 )
 
@@ -503,11 +508,23 @@ func parseCondField(field string) (string, CondType) {
 	if len(k) == 2 {
 		return k[0], parseCond(k[1])
 	}
-	return field, condBase
+	return field, condEq
 }
 
 func parseCond(cond string) CondType {
 	switch cond {
+	case "eq":
+		return condEq
+	case "neq":
+		return condNeq
+	case "lt":
+		return condLt
+	case "leq":
+		return condLeq
+	case "gt":
+		return condGt
+	case "geq":
+		return condGeq
 	case "arr":
 		return condArr
 	default:
@@ -606,9 +623,28 @@ func (q *QueryField) genQueryCondSQL(offset int) QueryCondSQLStrings {
 		dbName := i.Field.DBName
 		paramType := i.Field.GoType
 		identName := i.Field.Ident
-		if i.Kind == condArr {
+		condText := "="
+		switch i.Kind {
+		case condNeq:
+			identName = "Neq" + identName
+			condText = "<>"
+		case condLt:
+			identName = "Lt" + identName
+			condText = "<"
+		case condLeq:
+			identName = "Leq" + identName
+			condText = "<="
+		case condGt:
+			identName = "Gt" + identName
+			condText = ">"
+		case condGeq:
+			identName = "Geq" + identName
+			condText = ">="
+		case condArr:
 			paramType = "[]" + paramType
 			identName = "Has" + identName
+		default:
+			identName = "Eq" + identName
 		}
 
 		if i.Kind == condArr {
@@ -617,7 +653,7 @@ func (q *QueryField) genQueryCondSQL(offset int) QueryCondSQLStrings {
 			sqlArrIdentArgsLen = append(sqlArrIdentArgsLen, fmt.Sprintf("len(%s)", paramName))
 		} else {
 			paramCount++
-			sqlDBCond = append(sqlDBCond, fmt.Sprintf("%s = $%d", dbName, paramCount))
+			sqlDBCond = append(sqlDBCond, fmt.Sprintf("%s %s $%d", dbName, condText, paramCount))
 			sqlIdentArgs = append(sqlIdentArgs, paramName)
 		}
 		sqlIdentParams = append(sqlIdentParams, fmt.Sprintf("%s %s", paramName, paramType))

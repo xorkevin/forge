@@ -1,7 +1,7 @@
 package model
 
 const templateGetGroupEq = `
-func {{.Prefix}}ModelGet{{.ModelIdent}}Eq{{.SQLCond.IdentNames}}Ord{{.PrimaryField.Ident}}(db *sql.DB, {{.SQLCond.IdentParams}}, orderasc bool, limit, offset int) ([]{{.ModelIdent}}, error) {
+func {{.Prefix}}ModelGet{{.ModelIdent}}{{.SQLCond.IdentNames}}Ord{{.PrimaryField.Ident}}(db *sql.DB, {{.SQLCond.IdentParams}}, orderasc bool, limit, offset int) ([]{{.ModelIdent}}, error) {
 	{{- if .SQLCond.ArrIdentArgs }}
 	paramCount := {{.SQLCond.ParamCount}}
 	args := make([]interface{}, 0, paramCount{{with .SQLCond.ArrIdentArgsLen}}+{{.}}{{end}})

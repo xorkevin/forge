@@ -57,9 +57,16 @@ Valid flags are:
 	- deleq: args(equal_field,...), deletes all rows where the equal fields(s)
 	are equal to the input
 
-equal_field may be in the form of a column_name or column_name|arr indicating
-that the returned rows may have that column equal to one of the values of the
-input set
+equal_field by default has a condition of eq, but it may be explicitly
+specified by column_name|cond. cond may be one of:
+	- eq: column value equals the input
+	- neq: column value not equal to the input
+	- lt: column value less than the input
+	- leq: column value less than or equal to the input
+	- gt: column value greater than the input
+	- geq: column value greater than or equal to the input
+	- arr: column value equals one of the values of the input set
+
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		model.Execute(modelVerbose, versionString, modelOutputFile, modelOutputPrefix, modelTableName, modelModelName, args)

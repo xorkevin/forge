@@ -1,7 +1,7 @@
 package model
 
 const templateDelEq = `
-func {{.Prefix}}ModelDelEq{{.SQLCond.IdentNames}}(db *sql.DB, {{.SQLCond.IdentParams}}) error {
+func {{.Prefix}}ModelDel{{.SQLCond.IdentNames}}(db *sql.DB, {{.SQLCond.IdentParams}}) error {
 	{{- if .SQLCond.ArrIdentArgs }}
 	paramCount := {{.SQLCond.ParamCount}}
 	args := make([]interface{}, 0, paramCount{{with .SQLCond.ArrIdentArgsLen}}+{{.}}{{end}})

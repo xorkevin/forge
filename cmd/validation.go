@@ -17,7 +17,62 @@ var (
 var validationCmd = &cobra.Command{
 	Use:   "validation [query ...]",
 	Short: "Generates validations",
-	Long:  `Generates common validation on go structs`,
+	Long: `Generates common validation on go structs
+
+forge validation code generates a validation method for structs, where for
+every struct field tagged with valid, a function based on the tag value will be
+called.
+
+For example, for a struct defined as:
+
+	type test struct {
+		field1 string ` + "`" + `valid:"field"` + "`" + `
+		field2 int ` + "`" + `valid:"other"` + "`" + `
+	}
+
+a method will be generated with the name of prefix (default: valid) calling
+functions beginning with validatep (default: valid) or hasp (default: validhas)
+and returning error. The example from above with the default options would
+generate:
+
+	func (r test) valid() error {
+		if err := validField(r.field1); err != nil {
+			return err
+		}
+		if err := validOther(r.field2); err != nil {
+			return err
+		}
+		return nil
+	}
+
+A valid tag value may also be suffixed with ",has" as in:
+
+	type test struct {
+		field1 string ` + "`" + `valid:"field"` + "`" + `
+		field2 int ` + "`" + `valid:"other,has"` + "`" + `
+	}
+
+which with the default options would generate:
+
+	func (r test) valid() error {
+		if err := validField(r.field1); err != nil {
+			return err
+		}
+		if err := validhasOther(r.field2); err != nil {
+			return err
+		}
+		return nil
+	}
+
+The "has" suffix is a feature designed to allow certain fields to be validated
+by functions that are less restrictive than the non-has variant. This is to
+allow the robustness principle: "Be conservative in what you send, be liberal
+in what you accept." The "has" suffix is also useful in cases where the legal
+values of newly created fields may change over time, such as password length
+requirements increasing, but the application must still allow older existing
+input values.
+
+`,
 	Run: func(cmd *cobra.Command, args []string) {
 		validation.Execute(validationVerbose, versionString, validationOutputFile, validationOutputPrefix, validationValidatePrefix, validationHasPrefix, args)
 	},
