@@ -24,7 +24,7 @@ Directives appear in the form of:
 .RS
 
 .nf
-<prefix>command args...<suffix>
+PREFIX command args... SUFFIX
 
 .fi
 .RE
@@ -33,7 +33,7 @@ Directives appear in the form of:
 forge gen directives end on the first new line or suffix.
 
 .PP
-Shell execution is driven by nutcracker.
+Shell execution is driven by sh \-c CMD.
 
 .PP
 By default the files that git ignores and git submodules will be ignored. This
@@ -49,6 +49,7 @@ forge gen provides the follwing environment variables to the executed command:
 .RS
 
 .nf
+FORGEDIR: path of the current working directory
 FORGEPATH: filepath of the file with the forge directive
 FORGEFILE: filename of the file with the forge directive
 

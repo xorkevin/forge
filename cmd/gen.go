@@ -21,11 +21,11 @@ var genCmd = &cobra.Command{
 
 Directives appear in the form of:
 
-	<prefix>command args...<suffix>
+	PREFIX command args... SUFFIX
 
 forge gen directives end on the first new line or suffix.
 
-Shell execution is driven by nutcracker.
+Shell execution is driven by sh -c CMD.
 
 By default the files that git ignores and git submodules will be ignored. This
 behavior may be changed with -i, --noignore.
@@ -34,6 +34,7 @@ A dry run of the commands will be shown with the -n flag.
 
 forge gen provides the follwing environment variables to the executed command:
 
+	FORGEDIR: path of the current working directory
 	FORGEPATH: filepath of the file with the forge directive
 	FORGEFILE: filename of the file with the forge directive
 `,

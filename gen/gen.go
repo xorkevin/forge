@@ -11,10 +11,10 @@ import (
 	"path/filepath"
 	"strings"
 	"unicode/utf8"
-	"xorkevin.dev/nutcracker"
 )
 
 const (
+	envforgedir  = "FORGEDIR"
 	envforgepath = "FORGEPATH"
 	envforgefile = "FORGEFILE"
 )
@@ -60,7 +60,7 @@ func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose b
 	if err != nil {
 		log.Fatal(err)
 	}
-	environ := append(os.Environ(), "FORGEDIR="+workingDir)
+	os.Setenv(envforgedir, workingDir)
 
 	if verbose {
 		fmt.Printf("prefix: %s; suffix: %s\n", prefix, suffix)
@@ -89,8 +89,6 @@ func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose b
 			fmt.Println("-", i)
 		}
 	}
-
-	ex := nutcracker.NewExecutor()
 
 	filepathSet := newStringSet(0)
 	for _, i := range paths {
@@ -149,27 +147,15 @@ func Execute(prefix string, suffix string, noIgnore bool, dryRun bool, verbose b
 		}
 
 		filename := filepath.Base(fpath)
-		envvar := nutcracker.Env{
-			Envvar: append(environ, envforgepath+"="+fpath, envforgefile+"="+filename),
-			Envfunc: func(name string) string {
-				switch name {
-				case envforgepath:
-					return fpath
-				case envforgefile:
-					return filename
-				default:
-					val, _ := os.LookupEnv(name)
-					return val
-				}
-			},
-			Stdout: os.Stdout,
-			Stderr: os.Stderr,
-			Ex:     ex,
-		}
+		os.Setenv(envforgepath, fpath)
+		os.Setenv(envforgefile, filename)
 		for _, i := range directives {
-			fmt.Printf("forge exec: %s count %d: %s\n", fpath, i.count, i.text)
+			fmt.Printf("forge exec: %s count %d: %s\n", fpath, i.count, i.cmd)
 			if !dryRun {
-				if err := i.cmd.Exec(envvar); err != nil {
+				cmd := exec.Command("sh", "-c", i.cmd)
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				if err := cmd.Run(); err != nil {
 					fmt.Printf("failed: %s", err)
 				}
 			}
@@ -226,8 +212,7 @@ func makeSplitDirective(prefix, suffix string) bufio.SplitFunc {
 type (
 	directive struct {
 		count int
-		cmd   *nutcracker.Cmd
-		text  string
+		cmd   string
 	}
 )
 
@@ -246,14 +231,13 @@ func parseFile(fpath string, splitDirective bufio.SplitFunc) ([]directive, error
 	scanner := bufio.NewScanner(file)
 	scanner.Split(splitDirective)
 	for i := 0; scanner.Scan(); i++ {
-		cmd, text, err := parseDirective(scanner.Text())
+		cmd := parseDirective(scanner.Text())
 		if err != nil {
 			return nil, fmt.Errorf("count %d: %s", i, err)
 		}
 		directives = append(directives, directive{
 			count: i,
 			cmd:   cmd,
-			text:  text,
 		})
 	}
 	if err := scanner.Err(); err != nil {
@@ -262,13 +246,8 @@ func parseFile(fpath string, splitDirective bufio.SplitFunc) ([]directive, error
 	return directives, nil
 }
 
-func parseDirective(directive string) (*nutcracker.Cmd, string, error) {
-	directive = strings.TrimSpace(directive)
-	cmd, err := nutcracker.Parse(directive)
-	if err != nil {
-		return nil, "", err
-	}
-	return cmd, strings.ReplaceAll(directive, "\n", "\\n"), nil
+func parseDirective(directive string) string {
+	return strings.TrimSpace(directive)
 }
 
 func generateIgnorePathSet() (*stringSet, error) {
