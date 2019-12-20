@@ -5,7 +5,7 @@ func {{.Prefix}}ModelGet{{.ModelIdent}}{{.SQLCond.IdentNames}}Ord{{.PrimaryField
 	{{- if .SQLCond.ArrIdentArgs }}
 	paramCount := {{.SQLCond.ParamCount}}
 	args := make([]interface{}, 0, paramCount{{with .SQLCond.ArrIdentArgsLen}}+{{.}}{{end}})
-	args = append(args, limit, offset{{if .SQLCond.IdentArgs}}{{.SQLCond.IdentArgs}}{{end}})
+	args = append(args, limit, offset{{if .SQLCond.IdentArgs}}, {{.SQLCond.IdentArgs}}{{end}})
 	{{- end }}
 	{{- range .SQLCond.ArrIdentArgs }}
 	var placeholders{{.}} string
