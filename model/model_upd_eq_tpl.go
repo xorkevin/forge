@@ -19,7 +19,7 @@ func {{.Prefix}}ModelUpd{{.ModelIdent}}{{.SQLCond.IdentNames}}(db *sql.DB, m *{{
 		placeholders{{.}} = strings.Join(placeholders, ", ")
 	}
 	{{- end }}
-	_, err := db.Exec("UPDATE {{.TableName}} SET ({{.SQL.DBNames}}) = ({{.SQL.Placeholders}}) WHERE {{.SQLCond.DBCond}};", {{if .SQLCond.ArrIdentArgs}}args...{{else}}{{.SQL.Idents}}, {{.SQLCond.IdentArgs}}{{end}})
+	_, err := db.Exec("UPDATE {{.TableName}} SET ({{.SQL.DBNames}}) = ROW({{.SQL.Placeholders}}) WHERE {{.SQLCond.DBCond}};", {{if .SQLCond.ArrIdentArgs}}args...{{else}}{{.SQL.Idents}}, {{.SQLCond.IdentArgs}}{{end}})
 	if err != nil {
 		if postgresErr, ok := err.(*pq.Error); ok {
 			switch postgresErr.Code {
