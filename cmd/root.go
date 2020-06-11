@@ -53,16 +53,14 @@ func initConfig() {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
 	} else {
-		// Find config directory.
-		cfgdir, err := os.UserConfigDir()
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+		viper.SetConfigName(".forge")
+		viper.AddConfigPath(".")
 
 		// Search config in XDG_CONFIG_HOME directory with name ".forge" (without extension).
-		viper.AddConfigPath(cfgdir)
-		viper.SetConfigName(".forge")
+		cfgdir, err := os.UserConfigDir()
+		if err == nil {
+			viper.AddConfigPath(cfgdir)
+		}
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
