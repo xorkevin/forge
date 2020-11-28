@@ -501,6 +501,7 @@ const (
 	condGt
 	condGeq
 	condArr
+	condLike
 )
 
 func parseCondField(field string) (string, CondType) {
@@ -527,6 +528,8 @@ func parseCond(cond string) CondType {
 		return condGeq
 	case "arr":
 		return condArr
+	case "like":
+		return condLike
 	default:
 		log.Fatal("Illegal cond type " + cond)
 	}
@@ -643,6 +646,9 @@ func (q *QueryField) genQueryCondSQL(offset int) QueryCondSQLStrings {
 		case condArr:
 			paramType = "[]" + paramType
 			identName = "Has" + identName
+		case condLike:
+			identName = "Like" + identName
+			condText = "LIKE"
 		default:
 			identName = "Eq" + identName
 		}

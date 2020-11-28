@@ -66,6 +66,7 @@ specified by column_name|cond. cond may be one of:
 	- gt: column value greater than the input
 	- geq: column value greater than or equal to the input
 	- arr: column value equals one of the values of the input set
+	- like: column value like the input
 
 `,
 	Run: func(cmd *cobra.Command, args []string) {
