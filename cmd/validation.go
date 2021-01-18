@@ -11,6 +11,7 @@ var (
 	validationOutputPrefix   string
 	validationValidatePrefix string
 	validationHasPrefix      string
+	validationOptPrefix      string
 )
 
 // validationCmd represents the validation command
@@ -64,6 +65,25 @@ which with the default options would generate:
 		return nil
 	}
 
+A valid tag value may also be suffixed with ",opt" as in:
+
+	type test struct {
+		field1 string ` + "`" + `valid:"field"` + "`" + `
+		field2 int ` + "`" + `valid:"other,opt"` + "`" + `
+	}
+
+which with the default options would generate:
+
+	func (r test) valid() error {
+		if err := validField(r.field1); err != nil {
+			return err
+		}
+		if err := validoptOther(r.field2); err != nil {
+			return err
+		}
+		return nil
+	}
+
 The "has" suffix is a feature designed to allow certain fields to be validated
 by functions that are less restrictive than the non-has variant. This is to
 allow the robustness principle: "Be conservative in what you send, be liberal
@@ -72,9 +92,11 @@ values of newly created fields may change over time, such as password length
 requirements increasing, but the application must still allow older existing
 input values.
 
+The "opt" suffix is a feature designed to allow certain fields to be omitted.
+
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		validation.Execute(validationVerbose, versionString, validationOutputFile, validationOutputPrefix, validationValidatePrefix, validationHasPrefix, args)
+		validation.Execute(validationVerbose, versionString, validationOutputFile, validationOutputPrefix, validationValidatePrefix, validationHasPrefix, validationOptPrefix, args)
 	},
 }
 
@@ -90,6 +112,7 @@ func init() {
 	validationCmd.PersistentFlags().StringVarP(&validationOutputPrefix, "prefix", "p", "valid", "prefix of identifiers in generated file")
 	validationCmd.PersistentFlags().StringVarP(&validationValidatePrefix, "validatep", "c", "valid", "prefix of validation functions")
 	validationCmd.PersistentFlags().StringVarP(&validationHasPrefix, "hasp", "d", "validhas", "prefix of has functions")
+	validationCmd.PersistentFlags().StringVarP(&validationOptPrefix, "optp", "e", "validopt", "prefix of opt functions")
 	validationCmd.PersistentFlags().BoolVarP(&validationVerbose, "verbose", "v", false, "increase the verbosity of output")
 
 	// Cobra supports local flags which will only run when this command

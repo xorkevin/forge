@@ -36,6 +36,7 @@ type (
 		GoType string
 		Key    string
 		Has    bool
+		Opt    bool
 	}
 
 	MainTemplateData struct {
@@ -49,11 +50,12 @@ type (
 		Ident       string
 		PrefixValid string
 		PrefixHas   string
+		PrefixOpt   string
 		Fields      []ValidationField
 	}
 )
 
-func Execute(verbose bool, version, generatedFilepath, prefix, prefixValid, prefixHas string, validationIdents []string) {
+func Execute(verbose bool, version, generatedFilepath, prefix, prefixValid, prefixHas, prefixOpt string, validationIdents []string) {
 	gopackage := os.Getenv("GOPACKAGE")
 	if len(gopackage) == 0 {
 		log.Fatal("Environment variable GOPACKAGE not provided by go generate")
@@ -110,6 +112,7 @@ func Execute(verbose bool, version, generatedFilepath, prefix, prefixValid, pref
 			Ident:       i.Ident,
 			PrefixValid: prefixValid,
 			PrefixHas:   prefixHas,
+			PrefixOpt:   prefixOpt,
 			Fields:      i.Fields,
 		}
 		if err := tplvalidate.Execute(genFileWriter, tplData); err != nil {
@@ -218,6 +221,7 @@ func parseValidationFields(astfields []ASTField) []ValidationField {
 			GoType: i.GoType,
 			Key:    fieldname,
 			Has:    false,
+			Opt:    false,
 		}
 		if len(props) > 1 {
 			tags := strings.Split(props[1], ",")
@@ -228,6 +232,11 @@ func parseValidationFields(astfields []ASTField) []ValidationField {
 					log.Fatal("Field tag must be fieldname,flag for field " + i.Ident)
 				}
 				f.Has = true
+			case flagOpt:
+				if len(tags) != 1 {
+					log.Fatal("Field tag must be fieldname,flag for field " + i.Ident)
+				}
+				f.Opt = true
 			default:
 				if len(tags) != 1 {
 					log.Fatal("Field tag must be fieldname,flag for field " + i.Ident)
@@ -242,12 +251,15 @@ func parseValidationFields(astfields []ASTField) []ValidationField {
 
 const (
 	flagHas = iota
+	flagOpt
 )
 
 func parseFlag(flag string) int {
 	switch flag {
 	case "has":
 		return flagHas
+	case "opt":
+		return flagOpt
 	default:
 		log.Fatal("Illegal flag " + flag)
 	}
