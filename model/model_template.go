@@ -15,18 +15,25 @@ const (
 	{{.Prefix}}ModelTableName = "{{.TableName}}"
 )
 
-func {{.Prefix}}ModelSetup(db *sql.DB) error {
+func {{.Prefix}}ModelSetup(db *sql.DB) (int, error) {
 	_, err := db.Exec("CREATE TABLE IF NOT EXISTS {{.TableName}} ({{.SQL.Setup}});")
 	if err != nil {
-		return err
+		return 0, err
 	}
 	{{- range .SQL.Indicies }}
 	_, err = db.Exec("CREATE INDEX IF NOT EXISTS {{$.TableName}}_{{.}}_index ON {{$.TableName}} ({{.}});")
 	if err != nil {
-		return err
+		if postgresErr, ok := err.(*pq.Error); ok {
+			switch postgresErr.Code {
+			case "42501": // insufficient_privilege
+				return 5, err
+			default:
+				return 0, err
+			}
+		}
 	}
 	{{- end }}
-	return nil
+	return 0, nil
 }
 
 func {{.Prefix}}ModelInsert(db *sql.DB, m *{{.ModelIdent}}) (int, error) {
