@@ -29,9 +29,9 @@ type (
 	}
 
 	ModelDef struct {
-		Ident   string
-		Fields  []ModelField
-		Indexed []ModelField
+		Ident    string
+		Fields   []ModelField
+		Indicies [][]ModelField
 	}
 
 	QueryDef struct {
@@ -63,6 +63,11 @@ type (
 		Field ModelField
 	}
 
+	ModelIndex struct {
+		Name    string
+		Columns string
+	}
+
 	ModelSQLStrings struct {
 		Setup            string
 		DBNames          string
@@ -71,7 +76,7 @@ type (
 		PlaceholderCount string
 		Idents           string
 		IdentRefs        string
-		Indicies         []string
+		Indicies         []ModelIndex
 		ColNum           string
 	}
 
@@ -117,11 +122,11 @@ type (
 func Execute(verbose bool, version, generatedFilepath, prefix, tableName, modelIdent string, queryIdents []string) {
 	gopackage := os.Getenv("GOPACKAGE")
 	if len(gopackage) == 0 {
-		log.Fatal("Environment variable GOPACKAGE not provided by go generate")
+		log.Fatalln("Environment variable GOPACKAGE not provided by go generate")
 	}
 	gofile := os.Getenv("GOFILE")
 	if len(gofile) == 0 {
-		log.Fatal("Environment variable GOPACKAGE not provided by go generate")
+		log.Fatalln("Environment variable GOPACKAGE not provided by go generate")
 	}
 
 	fmt.Println(strings.Join([]string{
@@ -137,37 +142,37 @@ func Execute(verbose bool, version, generatedFilepath, prefix, tableName, modelI
 
 	tplmodel, err := template.New("model").Parse(templateModel)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 
 	tplgetoneeq, err := template.New("getoneeq").Parse(templateGetOneEq)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 
 	tplgetgroup, err := template.New("getgroup").Parse(templateGetGroup)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 
 	tplgetgroupeq, err := template.New("getgroupeq").Parse(templateGetGroupEq)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 
 	tplupdeq, err := template.New("updeq").Parse(templateUpdEq)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 
 	tpldeleq, err := template.New("deleq").Parse(templateDelEq)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 
 	genfile, err := os.OpenFile(generatedFilepath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 	defer genfile.Close()
 	genFileWriter := bufio.NewWriter(genfile)
@@ -183,7 +188,7 @@ func Execute(verbose bool, version, generatedFilepath, prefix, tableName, modelI
 		SQL:        modelDef.genModelSQL(),
 	}
 	if err := tplmodel.Execute(genFileWriter, tplData); err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 
 	if verbose {
@@ -213,26 +218,26 @@ func Execute(verbose bool, version, generatedFilepath, prefix, tableName, modelI
 			case flagGetOneEq:
 				tplData.SQLCond = i.genQueryCondSQL(0)
 				if err := tplgetoneeq.Execute(genFileWriter, tplData); err != nil {
-					log.Fatal(err)
+					log.Fatalln(err)
 				}
 			case flagGetGroup:
 				if err := tplgetgroup.Execute(genFileWriter, tplData); err != nil {
-					log.Fatal(err)
+					log.Fatalln(err)
 				}
 			case flagGetGroupEq:
 				tplData.SQLCond = i.genQueryCondSQL(2)
 				if err := tplgetgroupeq.Execute(genFileWriter, tplData); err != nil {
-					log.Fatal(err)
+					log.Fatalln(err)
 				}
 			case flagUpdEq:
 				tplData.SQLCond = i.genQueryCondSQL(len(queryDef.Fields))
 				if err := tplupdeq.Execute(genFileWriter, tplData); err != nil {
-					log.Fatal(err)
+					log.Fatalln(err)
 				}
 			case flagDelEq:
 				tplData.SQLCond = i.genQueryCondSQL(0)
 				if err := tpldeleq.Execute(genFileWriter, tplData); err != nil {
-					log.Fatal(err)
+					log.Fatalln(err)
 				}
 			}
 		}
@@ -247,13 +252,13 @@ func parseDefinitions(gofile string, modelIdent string, queryIdents []string) (M
 	fset := token.NewFileSet()
 	root, err := parser.ParseFile(fset, gofile, nil, parser.AllErrors)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 	if root.Decls == nil {
-		log.Fatal("No top level declarations")
+		log.Fatalln("No top level declarations")
 	}
 
-	modelFields, seenFields, indexedFields := parseModelFields(findFields(modelTagName, findStruct(modelIdent, root.Decls), fset))
+	modelFields, seenFields, indicies := parseModelFields(findFields(modelTagName, findStruct(modelIdent, root.Decls), fset))
 
 	deps := Dependencies{}
 	queryDefs := []QueryDef{}
@@ -268,9 +273,9 @@ func parseDefinitions(gofile string, modelIdent string, queryIdents []string) (M
 	}
 
 	return ModelDef{
-		Ident:   modelIdent,
-		Fields:  modelFields,
-		Indexed: indexedFields,
+		Ident:    modelIdent,
+		Fields:   modelFields,
+		Indicies: indicies,
 	}, queryDefs, deps.String()
 }
 
@@ -295,7 +300,7 @@ func findStruct(ident string, decls []ast.Decl) *ast.StructType {
 		}
 	}
 
-	log.Fatal(ident + " struct not found")
+	log.Fatalf("Struct %s not found\n", ident)
 	return nil
 }
 
@@ -313,11 +318,11 @@ func findFields(tagName string, modelDef *ast.StructType, fset *token.FileSet) [
 
 		goType := bytes.Buffer{}
 		if err := printer.Fprint(&goType, fset, field.Type); err != nil {
-			log.Fatal(err)
+			log.Fatalln(err)
 		}
 
 		if len(field.Names) != 1 {
-			log.Fatal("Only one field allowed per tag")
+			log.Fatalln("Only one field allowed per tag")
 		}
 
 		m := ASTField{
@@ -330,27 +335,27 @@ func findFields(tagName string, modelDef *ast.StructType, fset *token.FileSet) [
 	return fields
 }
 
-func parseModelFields(astfields []ASTField) ([]ModelField, map[string]ModelField, []ModelField) {
+func parseModelFields(astfields []ASTField) ([]ModelField, map[string]ModelField, [][]ModelField) {
 	seenFields := map[string]ModelField{}
-	indexedFields := []ModelField{}
+	tagIndicies := [][]string{}
 
 	fields := []ModelField{}
 	for n, i := range astfields {
 		tags := strings.SplitN(i.Tags, ",", 2)
 		if len(tags) < 2 {
-			log.Fatal("Model field tag must be dbname,dbtype[;index]")
+			log.Fatalln("Model field tag must be dbname,dbtype[;opt[,fields ...][; ...]]")
 		}
 		dbName := tags[0]
 		opts := strings.Split(tags[1], ";")
 		dbType := opts[0]
 		if len(dbName) == 0 {
-			log.Fatal(i.Ident + " dbname not set")
+			log.Fatalf("%s dbname not set\n", i.Ident)
 		}
 		if len(dbType) == 0 {
-			log.Fatal(i.Ident + " dbtype not set")
+			log.Fatalf("%s dbtype not set\n", i.Ident)
 		}
 		if _, ok := seenFields[dbName]; ok {
-			log.Fatal("Duplicate field " + dbName)
+			log.Fatalf("Duplicate field %s\n", dbName)
 		}
 		f := ModelField{
 			Ident:  i.Ident,
@@ -360,17 +365,31 @@ func parseModelFields(astfields []ASTField) ([]ModelField, map[string]ModelField
 			Num:    n + 1,
 		}
 		for _, i := range opts[1:] {
-			opt := parseModelOpt(i)
+			tags := strings.Split(i, ",")
+			opt := parseModelOpt(tags[0])
 			switch opt {
 			case optIndex:
-				indexedFields = append(indexedFields, f)
+				tagIndicies = append(tagIndicies, append(tags[1:], dbName))
 			}
 		}
 		seenFields[dbName] = f
 		fields = append(fields, f)
 	}
 
-	return fields, seenFields, indexedFields
+	indicies := [][]ModelField{}
+	for _, i := range tagIndicies {
+		k := make([]ModelField, 0, len(i))
+		for _, j := range i {
+			f, ok := seenFields[j]
+			if !ok {
+				log.Fatalf("Invalid index field %s for field %s\n", j, i[len(i)-1])
+			}
+			k = append(k, f)
+		}
+		indicies = append(indicies, k)
+	}
+
+	return fields, seenFields, indicies
 }
 
 func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([]QueryField, []QueryField, string) {
@@ -380,14 +399,14 @@ func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([
 
 	fields := []QueryField{}
 	for n, i := range astfields {
-		props := strings.SplitN(i.Tags, ",", 2)
+		props := strings.SplitN(i.Tags, ";", 2)
 		if len(props) < 1 {
-			log.Fatal("Field tag must be dbname[,flag[,args ...][; ...]]")
+			log.Fatalln("Field tag must be dbname[;flag[,args ...][; ...]]")
 		}
 		dbName := props[0]
 		modelField, ok := seenFields[dbName]
 		if !ok || i.GoType != modelField.GoType {
-			log.Fatal("Field " + dbName + " with type " + i.GoType + " does not exist on model")
+			log.Fatalf("Field %s with type %s does not exist on model\n", dbName, i.GoType)
 		}
 		f := QueryField{
 			Ident:  i.Ident,
@@ -406,7 +425,7 @@ func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([
 				switch tagflag {
 				case flagGetOneEq, flagGetGroupEq, flagUpdEq, flagDelEq:
 					if len(tags) < 2 {
-						log.Fatal("Field tag must be dbname,flag,eqcond,... for field " + i.Ident)
+						log.Fatalf("Field tag must be dbname;flag,fields,... for field %s\n", i.Ident)
 					}
 					k := make([]CondField, 0, len(tags[1:]))
 					for _, cond := range tags[1:] {
@@ -417,13 +436,13 @@ func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([
 								Field: field,
 							})
 						} else {
-							log.Fatal("Invalid eq condition field for field " + i.Ident)
+							log.Fatalf("Invalid condition field %s for field %s\n", condName, i.Ident)
 						}
 					}
 					f.Cond = k
 				default:
 					if len(tags) != 1 {
-						log.Fatal("Field tag must be dbname,flag for field " + i.Ident)
+						log.Fatalf("Field tag must be dbname,flag for field %s\n", i.Ident)
 					}
 				}
 				queryFields = append(queryFields, f)
@@ -432,7 +451,7 @@ func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([
 	}
 
 	if !hasQF {
-		log.Fatal("Query does not contain a query field")
+		log.Fatalln("Query does not contain a query field")
 	}
 
 	return fields, queryFields, deps.String()
@@ -451,7 +470,7 @@ func parseModelOpt(opt string) ModelOpt {
 	case "index":
 		return optIndex
 	default:
-		log.Fatal("Illegal opt " + opt)
+		log.Fatalf("Illegal opt %s\n", opt)
 	}
 	return -1
 }
@@ -484,7 +503,7 @@ func parseFlag(flag string) QueryFlag {
 	case "deleq":
 		return flagDelEq
 	default:
-		log.Fatal("Illegal flag " + flag)
+		log.Fatalf("Illegal flag %s\n", flag)
 	}
 	return -1
 }
@@ -531,7 +550,7 @@ func parseCond(cond string) CondType {
 	case "like":
 		return condLike
 	default:
-		log.Fatal("Illegal cond type " + cond)
+		log.Fatalf("Illegal cond type %s\n", cond)
 	}
 	return -1
 }
@@ -566,9 +585,16 @@ func (m *ModelDef) genModelSQL() ModelSQLStrings {
 		}
 	}
 
-	sqlIndicies := make([]string, 0, len(m.Indexed))
-	for _, i := range m.Indexed {
-		sqlIndicies = append(sqlIndicies, i.DBName)
+	sqlIndicies := make([]ModelIndex, 0, len(m.Indicies))
+	for _, i := range m.Indicies {
+		k := make([]string, 0, len(i))
+		for _, j := range i {
+			k = append(k, j.DBName)
+		}
+		sqlIndicies = append(sqlIndicies, ModelIndex{
+			Name:    strings.Join(k, "__"),
+			Columns: strings.Join(k, ", "),
+		})
 	}
 
 	return ModelSQLStrings{

@@ -21,7 +21,7 @@ func {{.Prefix}}ModelSetup(db *sql.DB) (int, error) {
 		return 0, err
 	}
 	{{- range .SQL.Indicies }}
-	_, err = db.Exec("CREATE INDEX IF NOT EXISTS {{$.TableName}}_{{.}}_index ON {{$.TableName}} ({{.}});")
+	_, err = db.Exec("CREATE INDEX IF NOT EXISTS {{$.TableName}}_{{.Name}}_index ON {{$.TableName}} ({{.Columns}});")
 	if err != nil {
 		if postgresErr, ok := err.(*pq.Error); ok {
 			switch postgresErr.Code {

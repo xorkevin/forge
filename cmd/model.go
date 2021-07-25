@@ -31,15 +31,19 @@ The SQL table's columns for a model are specified by the "model" tag on fields
 of a Go struct representing a row of the table. A "model" tag's value has the
 following syntax:
 
-	column_name,sql_type
+	column_name,sql_type[;opt[,args ...][; ...]]
 
 Fields without a "model" tag are ignored.
+
+Valid opts are:
+	- index: args(field,...), creates a index from the provided fields and
+	current field
 
 A query allows additional common case select statements to be code generated.
 It is specified by a "query" tag on a struct representing a row of the query
 result with a value of the syntax:
 
-	column_name[,flag[,args ...][; ...]]
+	column_name[;flag[,args ...][; ...]]
 
 column_name refers to the column name defined in the model. The go field type
 must also be the same between the model and the query.
