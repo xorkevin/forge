@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/spf13/cobra"
 	"xorkevin.dev/forge/model"
 )
@@ -11,6 +14,8 @@ var (
 	modelOutputPrefix string
 	modelTableName    string
 	modelModelName    string
+	modelModelTag     string
+	modelQueryTag     string
 )
 
 // modelCmd represents the model command
@@ -74,18 +79,28 @@ specified by column_name|cond. cond may be one of:
 
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		model.Execute(modelVerbose, versionString, modelOutputFile, modelOutputPrefix, modelTableName, modelModelName, args)
+		if err := model.Execute(
+			model.Opts{
+				Verbose:     modelVerbose,
+				Version:     versionString,
+				Output:      modelOutputFile,
+				Prefix:      modelOutputPrefix,
+				TableName:   modelTableName,
+				ModelIdent:  modelModelName,
+				QueryIdents: args,
+				ModelTag:    modelModelTag,
+				QueryTag:    modelQueryTag,
+			},
+		); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(modelCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// modelCmd.PersistentFlags().String("foo", "", "A help for foo")
 	modelCmd.PersistentFlags().StringVarP(&modelOutputFile, "output", "o", "model_gen.go", "output filename")
 	modelCmd.PersistentFlags().StringVarP(&modelOutputPrefix, "prefix", "p", "", "prefix of identifiers in generated file")
 	modelCmd.MarkFlagRequired("prefix")
@@ -93,9 +108,7 @@ func init() {
 	modelCmd.MarkFlagRequired("table")
 	modelCmd.PersistentFlags().StringVarP(&modelModelName, "model", "m", "", "name of the model identifier")
 	modelCmd.MarkFlagRequired("model")
+	modelCmd.PersistentFlags().StringVar(&modelModelTag, "model-tag", "model", "go struct tag for defining model fields")
+	modelCmd.PersistentFlags().StringVar(&modelModelTag, "query-tag", "query", "go struct tag for defining query fields")
 	modelCmd.PersistentFlags().BoolVarP(&modelVerbose, "verbose", "v", false, "increase the verbosity of output")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// modelCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
