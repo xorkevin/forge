@@ -79,19 +79,17 @@ specified by column_name|cond. cond may be one of:
 
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		if err := model.Execute(
-			model.Opts{
-				Verbose:     modelVerbose,
-				Version:     versionString,
-				Output:      modelOutputFile,
-				Prefix:      modelOutputPrefix,
-				TableName:   modelTableName,
-				ModelIdent:  modelModelName,
-				QueryIdents: args,
-				ModelTag:    modelModelTag,
-				QueryTag:    modelQueryTag,
-			},
-		); err != nil {
+		if err := model.Execute(model.Opts{
+			Verbose:     modelVerbose,
+			Version:     versionString,
+			Output:      modelOutputFile,
+			Prefix:      modelOutputPrefix,
+			TableName:   modelTableName,
+			ModelIdent:  modelModelName,
+			QueryIdents: args,
+			ModelTag:    modelModelTag,
+			QueryTag:    modelQueryTag,
+		}); err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}

@@ -414,6 +414,10 @@ func findFields(tagName string, modelDef *ast.StructType, fset *token.FileSet) (
 }
 
 func parseModelFields(astfields []ASTField) ([]ModelField, map[string]ModelField, [][]ModelField, error) {
+	if len(astfields) == 0 {
+		return nil, nil, nil, fmt.Errorf("%w: Model struct does not contain any model fields", ErrInvalidModel)
+	}
+
 	seenFields := map[string]ModelField{}
 	tagIndicies := [][]string{}
 

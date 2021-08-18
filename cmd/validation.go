@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/spf13/cobra"
 	"xorkevin.dev/forge/validation"
 )
@@ -12,6 +15,7 @@ var (
 	validationValidatePrefix string
 	validationHasPrefix      string
 	validationOptPrefix      string
+	validationTag            string
 )
 
 // validationCmd represents the validation command
@@ -32,9 +36,9 @@ For example, for a struct defined as:
 	}
 
 a method will be generated with the name of prefix (default: valid) calling
-functions beginning with validatep (default: valid) or hasp (default: validhas)
-and returning error. The example from above with the default options would
-generate:
+functions beginning with valid-prefix (default: valid) or has-prefix (default:
+validhas) and returning error. The example from above with the default options
+would generate:
 
 	func (r test) valid() error {
 		if err := validField(r.field1); err != nil {
@@ -96,26 +100,31 @@ The "opt" suffix is a feature designed to allow certain fields to be omitted.
 
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		validation.Execute(validationVerbose, versionString, validationOutputFile, validationOutputPrefix, validationValidatePrefix, validationHasPrefix, validationOptPrefix, args)
+		if err := validation.Execute(validation.Opts{
+			Verbose:          validationVerbose,
+			Version:          versionString,
+			Output:           validationOutputFile,
+			Prefix:           validationOutputPrefix,
+			PrefixValid:      validationValidatePrefix,
+			PrefixHas:        validationHasPrefix,
+			PrefixOpt:        validationOptPrefix,
+			ValidationIdents: args,
+			Tag:              validationTag,
+		}); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(validationCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// validationCmd.PersistentFlags().String("foo", "", "A help for foo")
 	validationCmd.PersistentFlags().StringVarP(&validationOutputFile, "output", "o", "validation_gen.go", "output filename")
 	validationCmd.PersistentFlags().StringVarP(&validationOutputPrefix, "prefix", "p", "valid", "prefix of identifiers in generated file")
-	validationCmd.PersistentFlags().StringVarP(&validationValidatePrefix, "validatep", "c", "valid", "prefix of validation functions")
-	validationCmd.PersistentFlags().StringVarP(&validationHasPrefix, "hasp", "d", "validhas", "prefix of has functions")
-	validationCmd.PersistentFlags().StringVarP(&validationOptPrefix, "optp", "e", "validopt", "prefix of opt functions")
+	validationCmd.PersistentFlags().StringVar(&validationValidatePrefix, "valid-prefix", "valid", "prefix of validation functions")
+	validationCmd.PersistentFlags().StringVar(&validationHasPrefix, "has-prefix", "validhas", "prefix of has functions")
+	validationCmd.PersistentFlags().StringVar(&validationOptPrefix, "opt-prefix", "validopt", "prefix of opt functions")
+	validationCmd.PersistentFlags().StringVar(&validationTag, "validate-tag", "valid", "go struct tag for defining field validations")
 	validationCmd.PersistentFlags().BoolVarP(&validationVerbose, "verbose", "v", false, "increase the verbosity of output")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// validationCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
