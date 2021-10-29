@@ -94,6 +94,7 @@ specified by column_name|cond. cond may be one of:
 			os.Exit(1)
 		}
 	},
+	DisableAutoGenTag: true,
 }
 
 func init() {

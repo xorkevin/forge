@@ -115,6 +115,7 @@ The "opt" suffix is a feature designed to allow certain fields to be omitted.
 			os.Exit(1)
 		}
 	},
+	DisableAutoGenTag: true,
 }
 
 func init() {
