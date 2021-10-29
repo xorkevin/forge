@@ -2,16 +2,20 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"os"
 )
 
 const (
 	versionString = "v0.3"
 )
 
-var cfgFile string
+var (
+	cfgFile   string
+	debugMode bool
+)
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -41,6 +45,7 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $XDG_CONFIG_HOME/.forge.yaml)")
+	rootCmd.PersistentFlags().BoolVar(&debugMode, "debug", false, "turn on debug output")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
@@ -66,7 +71,12 @@ func initConfig() {
 	viper.AutomaticEnv() // read in environment variables that match
 
 	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+	configErr := viper.ReadInConfig()
+	if debugMode {
+		if configErr == nil {
+			fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+		} else {
+			fmt.Fprintln(os.Stderr, "Failed reading config file:", configErr)
+		}
 	}
 }
