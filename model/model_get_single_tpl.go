@@ -1,7 +1,7 @@
 package model
 
 const templateGetOneEq = `
-func {{.Prefix}}ModelGet{{.ModelIdent}}{{.SQLCond.IdentNames}}(db *sql.DB, {{.SQLCond.IdentParams}}) (*{{.ModelIdent}}, int, error) {
+func {{.Prefix}}ModelGet{{.ModelIdent}}{{.SQLCond.IdentNames}}(db *sql.DB, {{.SQLCond.IdentParams}}) (*{{.ModelIdent}}, error) {
 	{{- if .SQLCond.ArrIdentArgs }}
 	paramCount := {{.SQLCond.ParamCount}}
 	args := make([]interface{}, 0, paramCount{{with .SQLCond.ArrIdentArgsLen}}+{{.}}{{end}})
@@ -21,19 +21,8 @@ func {{.Prefix}}ModelGet{{.ModelIdent}}{{.SQLCond.IdentNames}}(db *sql.DB, {{.SQ
 	{{- end }}
 	m := &{{.ModelIdent}}{}
 	if err := db.QueryRow("SELECT {{.SQL.DBNames}} FROM {{.TableName}} WHERE {{.SQLCond.DBCond}};", {{if .SQLCond.ArrIdentArgs}}args...{{else}}{{.SQLCond.IdentArgs}}{{end}}).Scan({{.SQL.IdentRefs}}); err != nil {
-		if err == sql.ErrNoRows {
-			return nil, 2, err
-		}
-		if postgresErr, ok := err.(*pq.Error); ok {
-			switch postgresErr.Code {
-			case "42P01": // undefined_table
-				return nil, 4, err
-			default:
-				return nil, 0, err
-			}
-		}
-		return nil, 0, err
+		return nil, err
 	}
-	return m, 0, nil
+	return m, nil
 }
 `

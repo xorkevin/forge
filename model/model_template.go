@@ -7,7 +7,6 @@ package {{.Package}}
 import (
 	"database/sql"
 	"fmt"
-	"github.com/lib/pq"
 	"strings"{{.Imports}}
 )
 
@@ -15,43 +14,29 @@ const (
 	{{.Prefix}}ModelTableName = "{{.TableName}}"
 )
 
-func {{.Prefix}}ModelSetup(db *sql.DB) (int, error) {
+func {{.Prefix}}ModelSetup(db *sql.DB) error {
 	_, err := db.Exec("CREATE TABLE IF NOT EXISTS {{.TableName}} ({{.SQL.Setup}});")
 	if err != nil {
-		return 0, err
+		return err
 	}
 	{{- range .SQL.Indicies }}
 	_, err = db.Exec("CREATE INDEX IF NOT EXISTS {{$.TableName}}_{{.Name}}_index ON {{$.TableName}} ({{.Columns}});")
 	if err != nil {
-		if postgresErr, ok := err.(*pq.Error); ok {
-			switch postgresErr.Code {
-			case "42501": // insufficient_privilege
-				return 5, err
-			default:
-				return 0, err
-			}
-		}
+		return err
 	}
 	{{- end }}
-	return 0, nil
+	return nil
 }
 
-func {{.Prefix}}ModelInsert(db *sql.DB, m *{{.ModelIdent}}) (int, error) {
+func {{.Prefix}}ModelInsert(db *sql.DB, m *{{.ModelIdent}}) error {
 	_, err := db.Exec("INSERT INTO {{.TableName}} ({{.SQL.DBNames}}) VALUES ({{.SQL.Placeholders}});", {{.SQL.Idents}})
 	if err != nil {
-		if postgresErr, ok := err.(*pq.Error); ok {
-			switch postgresErr.Code {
-			case "23505": // unique_violation
-				return 3, err
-			default:
-				return 0, err
-			}
-		}
+		return err
 	}
-	return 0, nil
+	return nil
 }
 
-func {{.Prefix}}ModelInsertBulk(db *sql.DB, models []*{{.ModelIdent}}, allowConflict bool) (int, error) {
+func {{.Prefix}}ModelInsertBulk(db *sql.DB, models []*{{.ModelIdent}}, allowConflict bool) error {
 	conflictSQL := ""
 	if allowConflict {
 		conflictSQL = " ON CONFLICT DO NOTHING"
@@ -65,15 +50,8 @@ func {{.Prefix}}ModelInsertBulk(db *sql.DB, models []*{{.ModelIdent}}, allowConf
 	}
 	_, err := db.Exec("INSERT INTO {{.TableName}} ({{.SQL.DBNames}}) VALUES "+strings.Join(placeholders, ", ")+conflictSQL+";", args...)
 	if err != nil {
-		if postgresErr, ok := err.(*pq.Error); ok {
-			switch postgresErr.Code {
-			case "23505": // unique_violation
-				return 3, err
-			default:
-				return 0, err
-			}
-		}
+		return err
 	}
-	return 0, nil
+	return nil
 }
 `
