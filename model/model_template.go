@@ -10,17 +10,13 @@ import (
 	"strings"{{.Imports}}
 )
 
-const (
-	{{.Prefix}}ModelTableName = "{{.TableName}}"
-)
-
-func {{.Prefix}}ModelSetup(db *sql.DB) error {
-	_, err := db.Exec("CREATE TABLE IF NOT EXISTS {{.TableName}} ({{.SQL.Setup}});")
+func {{.Prefix}}ModelSetup(db *sql.DB, tableName string) error {
+	_, err := db.Exec("CREATE TABLE IF NOT EXISTS "+tableName+" ({{.SQL.Setup}});")
 	if err != nil {
 		return err
 	}
 	{{- range .SQL.Indicies }}
-	_, err = db.Exec("CREATE INDEX IF NOT EXISTS {{$.TableName}}_{{.Name}}_index ON {{$.TableName}} ({{.Columns}});")
+	_, err = db.Exec("CREATE INDEX IF NOT EXISTS "+tableName+"_{{.Name}}_index ON "+tableName+" ({{.Columns}});")
 	if err != nil {
 		return err
 	}
@@ -28,15 +24,15 @@ func {{.Prefix}}ModelSetup(db *sql.DB) error {
 	return nil
 }
 
-func {{.Prefix}}ModelInsert(db *sql.DB, m *{{.ModelIdent}}) error {
-	_, err := db.Exec("INSERT INTO {{.TableName}} ({{.SQL.DBNames}}) VALUES ({{.SQL.Placeholders}});", {{.SQL.Idents}})
+func {{.Prefix}}ModelInsert(db *sql.DB, tableName string, m *{{.ModelIdent}}) error {
+	_, err := db.Exec("INSERT INTO "+tableName+" ({{.SQL.DBNames}}) VALUES ({{.SQL.Placeholders}});", {{.SQL.Idents}})
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func {{.Prefix}}ModelInsertBulk(db *sql.DB, models []*{{.ModelIdent}}, allowConflict bool) error {
+func {{.Prefix}}ModelInsertBulk(db *sql.DB, tableName string, models []*{{.ModelIdent}}, allowConflict bool) error {
 	conflictSQL := ""
 	if allowConflict {
 		conflictSQL = " ON CONFLICT DO NOTHING"
@@ -48,7 +44,7 @@ func {{.Prefix}}ModelInsertBulk(db *sql.DB, models []*{{.ModelIdent}}, allowConf
 		placeholders = append(placeholders, fmt.Sprintf("({{.SQL.PlaceholderTpl}})", {{.SQL.PlaceholderCount}}))
 		args = append(args, {{.SQL.Idents}})
 	}
-	_, err := db.Exec("INSERT INTO {{.TableName}} ({{.SQL.DBNames}}) VALUES "+strings.Join(placeholders, ", ")+conflictSQL+";", args...)
+	_, err := db.Exec("INSERT INTO "+tableName+" ({{.SQL.DBNames}}) VALUES "+strings.Join(placeholders, ", ")+conflictSQL+";", args...)
 	if err != nil {
 		return err
 	}

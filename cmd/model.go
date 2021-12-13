@@ -12,7 +12,6 @@ var (
 	modelVerbose      bool
 	modelOutputFile   string
 	modelOutputPrefix string
-	modelTableName    string
 	modelModelName    string
 	modelModelTag     string
 	modelQueryTag     string
@@ -84,7 +83,6 @@ specified by column_name|cond. cond may be one of:
 			Version:     versionString,
 			Output:      modelOutputFile,
 			Prefix:      modelOutputPrefix,
-			TableName:   modelTableName,
 			ModelIdent:  modelModelName,
 			QueryIdents: args,
 			ModelTag:    modelModelTag,
@@ -103,8 +101,6 @@ func init() {
 	modelCmd.PersistentFlags().StringVarP(&modelOutputFile, "output", "o", "model_gen.go", "output filename")
 	modelCmd.PersistentFlags().StringVarP(&modelOutputPrefix, "prefix", "p", "", "prefix of identifiers in generated file")
 	modelCmd.MarkFlagRequired("prefix")
-	modelCmd.PersistentFlags().StringVarP(&modelTableName, "table", "t", "", "name of the table in the database")
-	modelCmd.MarkFlagRequired("table")
 	modelCmd.PersistentFlags().StringVarP(&modelModelName, "model", "m", "", "name of the model identifier")
 	modelCmd.MarkFlagRequired("model")
 	modelCmd.PersistentFlags().StringVar(&modelModelTag, "model-tag", "model", "go struct tag for defining model fields")

@@ -1,13 +1,13 @@
 package model
 
 const templateGetGroup = `
-func {{.Prefix}}ModelGet{{.ModelIdent}}Ord{{.PrimaryField.Ident}}(db *sql.DB, orderasc bool, limit, offset int) ([]{{.ModelIdent}}, error) {
+func {{.Prefix}}ModelGet{{.ModelIdent}}Ord{{.PrimaryField.Ident}}(db *sql.DB, tableName string, orderasc bool, limit, offset int) ([]{{.ModelIdent}}, error) {
 	order := "DESC"
 	if orderasc {
 		order = "ASC"
 	}
 	res := make([]{{.ModelIdent}}, 0, limit)
-	rows, err := db.Query("SELECT {{.SQL.DBNames}} FROM {{.TableName}} ORDER BY {{.PrimaryField.DBName}} "+order+" LIMIT $1 OFFSET $2;", limit, offset)
+	rows, err := db.Query("SELECT {{.SQL.DBNames}} FROM "+tableName+" ORDER BY {{.PrimaryField.DBName}} "+order+" LIMIT $1 OFFSET $2;", limit, offset)
 	if err != nil {
 		return nil, err
 	}

@@ -97,7 +97,6 @@ type (
 		Version    string
 		Package    string
 		Prefix     string
-		TableName  string
 		Imports    string
 		ModelIdent string
 		SQL        ModelSQLStrings
@@ -123,7 +122,6 @@ type (
 
 	QueryTemplateData struct {
 		Prefix       string
-		TableName    string
 		ModelIdent   string
 		PrimaryField QueryField
 		SQL          QuerySQLStrings
@@ -137,7 +135,6 @@ type (
 		Version     string
 		Output      string
 		Prefix      string
-		TableName   string
 		ModelIdent  string
 		QueryIdents []string
 		ModelTag    string
@@ -172,7 +169,6 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env execEnv) error 
 		"Generating model",
 		fmt.Sprintf("Package: %s", env.GoPackage),
 		fmt.Sprintf("Source file: %s", env.GoFile),
-		fmt.Sprintf("Table name: %s", opts.TableName),
 		fmt.Sprintf("Model ident: %s", opts.ModelIdent),
 		fmt.Sprintf("Additional queries: %s", strings.Join(opts.QueryIdents, ", ")),
 	}, "; "))
@@ -223,7 +219,6 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env execEnv) error 
 		Version:    opts.Version,
 		Package:    env.GoPackage,
 		Prefix:     opts.Prefix,
-		TableName:  opts.TableName,
 		ModelIdent: modelDef.Ident,
 		SQL:        modelDef.genModelSQL(),
 	}
@@ -249,7 +244,6 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env execEnv) error 
 		for _, i := range queryDef.QueryFields {
 			tplData := QueryTemplateData{
 				Prefix:       opts.Prefix,
-				TableName:    opts.TableName,
 				ModelIdent:   queryDef.Ident,
 				PrimaryField: i,
 				SQL:          querySQLStrings,
