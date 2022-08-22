@@ -1,7 +1,7 @@
 package model
 
 const templateGetOneEq = `
-func {{.Prefix}}ModelGet{{.ModelIdent}}{{.SQLCond.IdentNames}}(db *sql.DB, tableName string, {{.SQLCond.IdentParams}}) (*{{.ModelIdent}}, error) {
+func (t *{{.Prefix}}ModelTable) Get{{.ModelIdent}}{{.SQLCond.IdentNames}}(ctx context.Context, d db.SQLExecutor, {{.SQLCond.IdentParams}}) (*{{.ModelIdent}}, error) {
 	{{- if .SQLCond.ArrIdentArgs }}
 	paramCount := {{.SQLCond.ParamCount}}
 	args := make([]interface{}, 0, paramCount{{with .SQLCond.ArrIdentArgsLen}}+{{.}}{{end}})
@@ -20,7 +20,7 @@ func {{.Prefix}}ModelGet{{.ModelIdent}}{{.SQLCond.IdentNames}}(db *sql.DB, table
 	}
 	{{- end }}
 	m := &{{.ModelIdent}}{}
-	if err := db.QueryRow("SELECT {{.SQL.DBNames}} FROM "+tableName+" WHERE {{.SQLCond.DBCond}};", {{if .SQLCond.ArrIdentArgs}}args...{{else}}{{.SQLCond.IdentArgs}}{{end}}).Scan({{.SQL.IdentRefs}}); err != nil {
+	if err := d.QueryRowContext(ctx, "SELECT {{.SQL.DBNames}} FROM "+t.TableName+" WHERE {{.SQLCond.DBCond}};", {{if .SQLCond.ArrIdentArgs}}args...{{else}}{{.SQLCond.IdentArgs}}{{end}}).Scan({{.SQL.IdentRefs}}); err != nil {
 		return nil, err
 	}
 	return m, nil

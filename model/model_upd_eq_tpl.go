@@ -1,7 +1,7 @@
 package model
 
 const templateUpdEq = `
-func {{.Prefix}}ModelUpd{{.ModelIdent}}{{.SQLCond.IdentNames}}(db *sql.DB, tableName string, m *{{.ModelIdent}}, {{.SQLCond.IdentParams}}) error {
+func (t *{{.Prefix}}ModelTable) Upd{{.ModelIdent}}{{.SQLCond.IdentNames}}(ctx context.Context, d db.SQLExecutor, m *{{.ModelIdent}}, {{.SQLCond.IdentParams}}) error {
 	{{- if .SQLCond.ArrIdentArgs }}
 	paramCount := {{.SQLCond.ParamCount}}
 	args := make([]interface{}, 0, paramCount{{with .SQLCond.ArrIdentArgsLen}}+{{.}}{{end}})
@@ -19,7 +19,7 @@ func {{.Prefix}}ModelUpd{{.ModelIdent}}{{.SQLCond.IdentNames}}(db *sql.DB, table
 		placeholders{{.}} = strings.Join(placeholders, ", ")
 	}
 	{{- end }}
-	_, err := db.Exec("UPDATE "+tableName+" SET ({{.SQL.DBNames}}) = ROW({{.SQL.Placeholders}}) WHERE {{.SQLCond.DBCond}};", {{if .SQLCond.ArrIdentArgs}}args...{{else}}{{.SQL.Idents}}, {{.SQLCond.IdentArgs}}{{end}})
+	_, err := d.ExecContext(ctx, "UPDATE "+t.TableName+" SET ({{.SQL.DBNames}}) = ROW({{.SQL.Placeholders}}) WHERE {{.SQLCond.DBCond}};", {{if .SQLCond.ArrIdentArgs}}args...{{else}}{{.SQL.Idents}}, {{.SQLCond.IdentArgs}}{{end}})
 	if err != nil {
 		return err
 	}
