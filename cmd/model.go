@@ -100,9 +100,9 @@ func init() {
 
 	modelCmd.PersistentFlags().StringVarP(&modelOutputFile, "output", "o", "model_gen.go", "output filename")
 	modelCmd.PersistentFlags().StringVarP(&modelOutputPrefix, "prefix", "p", "", "prefix of identifiers in generated file")
-	modelCmd.MarkFlagRequired("prefix")
+	modelCmd.MarkPersistentFlagRequired("prefix")
 	modelCmd.PersistentFlags().StringVarP(&modelModelName, "model", "m", "", "name of the model identifier")
-	modelCmd.MarkFlagRequired("model")
+	modelCmd.MarkPersistentFlagRequired("model")
 	modelCmd.PersistentFlags().StringVar(&modelModelTag, "model-tag", "model", "go struct tag for defining model fields")
 	modelCmd.PersistentFlags().StringVar(&modelQueryTag, "query-tag", "query", "go struct tag for defining query fields")
 	modelCmd.PersistentFlags().BoolVarP(&modelVerbose, "verbose", "v", false, "increase the verbosity of output")
