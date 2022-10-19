@@ -193,6 +193,14 @@ type (
 	}
 
 	// comment after foo
+
+	// Baz is a struct
+	//forge:abcd dir11
+	Baz struct {}
+
+	// Another is a struct
+	//forge:abc
+	Another struct {}
 )
 
 // constants here
@@ -240,7 +248,7 @@ var (
 	assert.NoError(err)
 
 	dirs := FindDirectives(astfiles, []string{"forge:abc", "forge:bc"})
-	assert.Len(dirs, 4)
+	assert.Len(dirs, 5)
 	for n, tc := range []struct {
 		Directives []DirectiveInstance
 		Kind       ObjKind
@@ -265,6 +273,16 @@ var (
 			},
 			Kind: ObjKindDeclType,
 			Name: "Foo",
+		},
+		{
+			Directives: []DirectiveInstance{
+				{
+					Sigil:     "forge:abc",
+					Directive: "forge:abc",
+				},
+			},
+			Kind: ObjKindDeclType,
+			Name: "Another",
 		},
 		{
 			Directives: []DirectiveInstance{

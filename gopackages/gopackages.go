@@ -9,6 +9,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"xorkevin.dev/kerrors"
 )
@@ -129,7 +130,8 @@ func (v *docCommentVisitor) Visit(node ast.Node) ast.Visitor {
 			}
 			text := strings.TrimPrefix(n.Text, "//")
 			for _, i := range v.sigils {
-				if strings.HasPrefix(text, i) {
+				if strings.HasPrefix(text, i) &&
+					(len(text) == len(i) || unicode.IsSpace(rune(text[len(i)]))) {
 					v.dirs = append(v.dirs, DirectiveInstance{
 						Sigil:     i,
 						Directive: text,
