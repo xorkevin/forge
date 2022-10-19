@@ -106,7 +106,7 @@ func Execute(opts Opts) error {
 		return kerrors.WithKind(nil, ErrorEnv{}, "Environment variable GOFILE not provided by go generate")
 	}
 
-	fmt.Println(strings.Join([]string{
+	log.Println(strings.Join([]string{
 		"Generating validation",
 		fmt.Sprintf("Package: %s", gopackage),
 		fmt.Sprintf("Source file: %s", gofile),
@@ -180,9 +180,9 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env execEnv) error 
 
 	for _, i := range validations {
 		if opts.Verbose {
-			fmt.Println("Detected validation " + i.Ident + " fields:")
+			log.Println("Detected validation " + i.Ident + " fields:")
 			for _, i := range i.Fields {
-				fmt.Printf("- %s %s\n", i.Ident, i.Key)
+				log.Printf("- %s %s\n", i.Ident, i.Key)
 			}
 		}
 		tplData := ValidationTemplateData{
@@ -202,7 +202,7 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env execEnv) error 
 		return fmt.Errorf("Failed to write to file %s: %w", opts.Output, err)
 	}
 
-	fmt.Printf("Generated file: %s\n", opts.Output)
+	log.Printf("Generated file: %s\n", opts.Output)
 	return nil
 }
 
