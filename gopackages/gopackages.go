@@ -13,12 +13,26 @@ import (
 	"xorkevin.dev/kerrors"
 )
 
-func ReadDir(fsys fs.FS, include, ignore *regexp.Regexp) ([]*ast.File, error) {
+type (
+	ErrorParseFile          struct{}
+	ErrorConflictingPackage struct{}
+)
+
+func (e ErrorParseFile) Error() string {
+	return "Failed parsing file"
+}
+
+func (e ErrorConflictingPackage) Error() string {
+	return "Conflicting package names"
+}
+
+func ReadDir(fsys fs.FS, include, ignore *regexp.Regexp) (*ast.Package, error) {
 	entries, err := fs.ReadDir(fsys, ".")
 	if err != nil {
 		return nil, kerrors.WithMsg(err, "Failed to read dir")
 	}
-	astfiles := make([]*ast.File, 0, len(entries))
+	pkgName := ""
+	astfiles := map[string]*ast.File{}
 	fset := token.NewFileSet()
 	for _, i := range entries {
 		if i.IsDir() {
@@ -28,7 +42,7 @@ func ReadDir(fsys fs.FS, include, ignore *regexp.Regexp) ([]*ast.File, error) {
 			continue
 		}
 		filename := i.Name()
-		if path.Ext(filename) != ".go" {
+		if path.Ext(filename) != ".go" || strings.HasSuffix(filename, "_test.go") {
 			continue
 		}
 		if include != nil && !include.MatchString(filename) {
@@ -41,9 +55,17 @@ func ReadDir(fsys fs.FS, include, ignore *regexp.Regexp) ([]*ast.File, error) {
 		if err != nil {
 			return nil, err
 		}
-		astfiles = append(astfiles, astfile)
+		if pkgName == "" {
+			pkgName = astfile.Name.Name
+		} else if astfile.Name.Name != pkgName {
+			return nil, kerrors.WithKind(nil, ErrorConflictingPackage{}, "Conflicting package names")
+		}
+		astfiles[filename] = astfile
 	}
-	return astfiles, nil
+	return &ast.Package{
+		Name:  pkgName,
+		Files: astfiles,
+	}, nil
 }
 
 func parseGoFile(fset *token.FileSet, fsys fs.FS, filename string) (*ast.File, error) {
@@ -58,50 +80,131 @@ func parseGoFile(fset *token.FileSet, fsys fs.FS, filename string) (*ast.File, e
 	}()
 	astfile, err := parser.ParseFile(fset, filename, file, parser.ParseComments)
 	if err != nil {
-		return nil, kerrors.WithMsg(err, "Failed to parse file")
+		return nil, kerrors.WithKind(err, ErrorParseFile{}, "Failed to parse file")
 	}
 	return astfile, nil
 }
 
-var (
-	topLevelASTObjKinds = map[ast.ObjKind]struct{}{
-		ast.Con: {},
-		ast.Typ: {},
-		ast.Var: {},
-		ast.Fun: {},
+const (
+	ObjKindUnknown    ObjKind = ""
+	ObjKindGroupConst         = "group.const"
+	ObjKindGroupVar           = "group.var"
+	ObjKindGroupType          = "group.type"
+	ObjKindDeclType           = "decl.type"
+)
+
+type (
+	ObjKind string
+
+	DirectiveInstance struct {
+		Sigil     string
+		Directive string
+	}
+
+	DirectiveObject struct {
+		Directives []DirectiveInstance
+		Kind       ObjKind
+		Obj        ast.Node
+	}
+
+	pkgVisitor struct {
+		sigils []string
+		objs   []DirectiveObject
+	}
+
+	docCommentVisitor struct {
+		sigils []string
+		dirs   []DirectiveInstance
 	}
 )
 
-func FindDirectives(astfiles []*ast.File, sigils []string) map[string][]*ast.Object {
-	dirToNode := map[string][]*ast.Object{}
-	for _, i := range astfiles {
-	objloop:
-		for _, j := range i.Scope.Objects {
-			if _, ok := topLevelASTObjKinds[j.Kind]; !ok {
-				continue
+func (v *docCommentVisitor) Visit(node ast.Node) ast.Visitor {
+	switch n := node.(type) {
+	case *ast.CommentGroup:
+		return v
+	case *ast.Comment:
+		{
+			if !strings.HasPrefix(n.Text, "//") {
+				return nil
 			}
-			var comments *ast.CommentGroup
-			switch k := j.Decl.(type) {
-			// Field, XxxSpec, FuncDecl, LabeledStmt, AssignStmt, Scope
-			case *ast.ValueSpec:
-				comments = k.Doc
-			case *ast.TypeSpec:
-				comments = k.Doc
-			case *ast.FuncDecl:
-				comments = k.Doc
-			}
-			if comments == nil {
-				continue
-			}
-			for _, c := range comments.List {
-				for _, s := range sigils {
-					if strings.HasPrefix(c.Text, s) {
-						dirToNode[s] = append(dirToNode[s], j)
-						continue objloop
-					}
+			text := strings.TrimPrefix(n.Text, "//")
+			for _, i := range v.sigils {
+				if strings.HasPrefix(text, i) {
+					v.dirs = append(v.dirs, DirectiveInstance{
+						Sigil:     i,
+						Directive: text,
+					})
+					return nil
 				}
 			}
+			return nil
 		}
+	default:
+		return nil
 	}
-	return dirToNode
+}
+
+func (v *pkgVisitor) Visit(node ast.Node) ast.Visitor {
+	if node == nil {
+		return nil
+	}
+	switch n := node.(type) {
+	case *ast.Package:
+		return v
+	case *ast.File:
+		return v
+	case *ast.GenDecl:
+		{
+			kind := ObjKindUnknown
+			switch n.Tok {
+			case token.IMPORT:
+				return nil
+			case token.CONST:
+				kind = ObjKindGroupConst
+			case token.TYPE:
+				kind = ObjKindGroupType
+			case token.VAR:
+				kind = ObjKindGroupVar
+			}
+			if kind != ObjKindUnknown {
+				visitor := &docCommentVisitor{
+					sigils: v.sigils,
+				}
+				ast.Walk(visitor, n.Doc)
+				if dirs := visitor.dirs; len(dirs) > 0 {
+					v.objs = append(v.objs, DirectiveObject{
+						Directives: dirs,
+						Kind:       kind,
+						Obj:        n,
+					})
+				}
+			}
+			return v
+		}
+	case *ast.TypeSpec:
+		{
+			visitor := &docCommentVisitor{
+				sigils: v.sigils,
+			}
+			ast.Walk(visitor, n.Doc)
+			if dirs := visitor.dirs; len(dirs) > 0 {
+				v.objs = append(v.objs, DirectiveObject{
+					Directives: dirs,
+					Kind:       ObjKindDeclType,
+					Obj:        n,
+				})
+			}
+			return nil
+		}
+	default:
+		return nil
+	}
+}
+
+func FindDirectives(pkg *ast.Package, sigils []string) []DirectiveObject {
+	visitor := &pkgVisitor{
+		sigils: sigils,
+	}
+	ast.Walk(visitor, pkg)
+	return visitor.objs
 }
