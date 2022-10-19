@@ -2,21 +2,19 @@ package validation
 
 import (
 	"bufio"
-	"bytes"
-	"errors"
 	"fmt"
 	"go/ast"
-	"go/parser"
-	"go/printer"
-	"go/token"
 	"io/fs"
 	"log"
 	"os"
 	"reflect"
+	"regexp"
 	"strings"
 	"text/template"
 
+	"xorkevin.dev/forge/gopackages"
 	"xorkevin.dev/forge/writefs"
+	"xorkevin.dev/kerrors"
 )
 
 const (
@@ -24,20 +22,29 @@ const (
 	generatedFileFlag = os.O_WRONLY | os.O_TRUNC | os.O_CREATE
 )
 
-var (
-	// ErrEnv is returned when model is run outside of go generate
-	ErrEnv = errors.New("Invalid execution environment")
-	// ErrInvalidFile is returned when parsing an invalid model file
-	ErrInvalidFile = errors.New("Invalid model file")
-	// ErrInvalidValidator is returned when parsing a validator with invalid syntax
-	ErrInvalidValidator = errors.New("Invalid validator")
+type (
+	// ErrorEnv is returned when validation is run outside of go generate
+	ErrorEnv struct{}
+	// ErrorInvalidFile is returned when parsing an invalid validation file
+	ErrorInvalidFile struct{}
+	// ErrorInvalidValidator is returned when parsing a validator with invalid syntax
+	ErrorInvalidValidator struct{}
 )
+
+func (e ErrorEnv) Error() string {
+	return "Invalid execution environment"
+}
+func (e ErrorInvalidFile) Error() string {
+	return "Invalid file"
+}
+func (e ErrorInvalidValidator) Error() string {
+	return "Invalid validator"
+}
 
 type (
 	ASTField struct {
-		Ident  string
-		GoType string
-		Tags   string
+		Ident string
+		Tags  string
 	}
 
 	ValidationDef struct {
@@ -46,11 +53,10 @@ type (
 	}
 
 	ValidationField struct {
-		Ident  string
-		GoType string
-		Key    string
-		Has    bool
-		Opt    bool
+		Ident string
+		Key   string
+		Has   bool
+		Opt   bool
 	}
 
 	MainTemplateData struct {
@@ -71,20 +77,21 @@ type (
 
 type (
 	Opts struct {
-		Verbose          bool
-		Version          string
-		Output           string
-		Prefix           string
-		PrefixValid      string
-		PrefixHas        string
-		PrefixOpt        string
-		ValidationIdents []string
-		Tag              string
+		Verbose     bool
+		Version     string
+		Output      string
+		Prefix      string
+		Include     string
+		Ignore      string
+		Directive   string
+		PrefixValid string
+		PrefixHas   string
+		PrefixOpt   string
+		Tag         string
 	}
 
 	execEnv struct {
 		GoPackage string
-		GoFile    string
 	}
 )
 
@@ -92,30 +99,53 @@ type (
 func Execute(opts Opts) error {
 	gopackage := os.Getenv("GOPACKAGE")
 	if len(gopackage) == 0 {
-		return fmt.Errorf("%w: Environment variable GOPACKAGE not provided by go generate", ErrEnv)
+		return kerrors.WithKind(nil, ErrorEnv{}, "Environment variable GOPACKAGE not provided by go generate")
 	}
 	gofile := os.Getenv("GOFILE")
 	if len(gofile) == 0 {
-		return fmt.Errorf("%w: Environment variable GOFILE not provided by go generate", ErrEnv)
+		return kerrors.WithKind(nil, ErrorEnv{}, "Environment variable GOFILE not provided by go generate")
 	}
+
+	fmt.Println(strings.Join([]string{
+		"Generating validation",
+		fmt.Sprintf("Package: %s", gopackage),
+		fmt.Sprintf("Source file: %s", gofile),
+	}, "; "))
 
 	return Generate(writefs.NewOS("."), os.DirFS("."), opts, execEnv{
 		GoPackage: gopackage,
-		GoFile:    gofile,
 	})
 }
 
 func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env execEnv) error {
-	fmt.Println(strings.Join([]string{
-		"Generating validation",
-		fmt.Sprintf("Package: %s", env.GoPackage),
-		fmt.Sprintf("Source file: %s", env.GoFile),
-		fmt.Sprintf("Validation structs: %s", strings.Join(opts.ValidationIdents, ", ")),
-	}, "; "))
+	var includePattern, ignorePattern *regexp.Regexp
+	if opts.Include != "" {
+		var err error
+		includePattern, err = regexp.Compile(opts.Include)
+		if err != nil {
+			return kerrors.WithMsg(err, "Invalid include regex")
+		}
+	}
+	if opts.Ignore != "" {
+		var err error
+		ignorePattern, err = regexp.Compile(opts.Ignore)
+		if err != nil {
+			return kerrors.WithMsg(err, "Invalid ignore regex")
+		}
+	}
 
-	validations, err := parseDefinitions(inputfs, env.GoFile, opts.ValidationIdents, opts.Tag)
+	astpkg, err := gopackages.ReadDir(inputfs, includePattern, ignorePattern)
 	if err != nil {
-		return fmt.Errorf("Failed to parse validation definitions: %w", err)
+		return err
+	}
+	directiveObjects := gopackages.FindDirectives(astpkg, []string{opts.Directive})
+	if len(directiveObjects) == 0 {
+		return kerrors.WithKind(nil, ErrorInvalidFile{}, "No validations found")
+	}
+
+	validations, err := parseDefinitions(directiveObjects, opts.Tag)
+	if err != nil {
+		return err
 	}
 
 	tplmain, err := template.New("main").Parse(templateMain)
@@ -152,7 +182,7 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env execEnv) error 
 		if opts.Verbose {
 			fmt.Println("Detected validation " + i.Ident + " fields:")
 			for _, i := range i.Fields {
-				fmt.Printf("- %s %s %s\n", i.Ident, i.GoType, i.Key)
+				fmt.Printf("- %s %s\n", i.Ident, i.Key)
 			}
 		}
 		tplData := ValidationTemplateData{
@@ -176,47 +206,37 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env execEnv) error 
 	return nil
 }
 
-func parseDefinitions(inputfs fs.FS, gofile string, validationIdents []string, validateTag string) ([]ValidationDef, error) {
-	fset := token.NewFileSet()
-	var root *ast.File
-	if err := func() error {
-		file, err := inputfs.Open(gofile)
-		if err != nil {
-			return fmt.Errorf("Failed reading file %s: %w", gofile, err)
+func parseDefinitions(directiveObjects []gopackages.DirectiveObject, validateTag string) ([]ValidationDef, error) {
+	var validationDefs []ValidationDef
+	for _, i := range directiveObjects {
+		if i.Kind != gopackages.ObjKindDeclType {
+			return nil, kerrors.WithKind(nil, ErrorInvalidFile{}, "Validation directive used on non-type declaration")
 		}
-		defer func() {
-			if err := file.Close(); err != nil {
-				log.Printf("Failed to close open file %s: %v", gofile, err)
-			}
-		}()
-		root, err = parser.ParseFile(fset, "", file, parser.AllErrors)
-		if err != nil {
-			return fmt.Errorf("Failed to parse file %s: %w", gofile, err)
+		typeSpec, ok := i.Obj.(*ast.TypeSpec)
+		if !ok {
+			return nil, kerrors.WithMsg(nil, "Unexpected directive object type")
 		}
-		return nil
-	}(); err != nil {
-		return nil, err
-	}
-	if root.Decls == nil {
-		return nil, fmt.Errorf("%w: No top level declarations in %s", ErrInvalidFile, gofile)
-	}
-
-	validationDefs := []ValidationDef{}
-	for _, ident := range validationIdents {
-		validationStruct := findStruct(ident, root.Decls)
-		if validationStruct == nil {
-			return nil, fmt.Errorf("%w: Struct %s not found in %s", ErrInvalidFile, ident, gofile)
+		structName := typeSpec.Name.Name
+		structType, ok := typeSpec.Type.(*ast.StructType)
+		if !ok {
+			return nil, kerrors.WithMsg(nil, "Validation directive used on non-struct type declaration")
 		}
-		astFields, err := findFields(validateTag, validationStruct, fset)
+		if structType.Incomplete {
+			return nil, kerrors.WithMsg(nil, "Unexpected incomplete struct definition")
+		}
+		astFields, err := findFields(validateTag, structType)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to parse validation struct %s: %w", ident, err)
+			return nil, err
+		}
+		if len(astFields) == 0 {
+			return nil, kerrors.WithKind(nil, ErrorInvalidFile{}, "No field validations found on struct")
 		}
 		fields, err := parseValidationFields(astFields)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to parse validation fields for struct %s: %w", ident, err)
+			return nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse validation fields for struct %s", structName))
 		}
 		validationDefs = append(validationDefs, ValidationDef{
-			Ident:  ident,
+			Ident:  structName,
 			Fields: fields,
 		})
 	}
@@ -224,103 +244,55 @@ func parseDefinitions(inputfs fs.FS, gofile string, validationIdents []string, v
 	return validationDefs, nil
 }
 
-func findStruct(ident string, decls []ast.Decl) *ast.StructType {
-	for _, i := range decls {
-		typeDecl, ok := i.(*ast.GenDecl)
-		if !ok || typeDecl.Tok != token.TYPE {
-			continue
-		}
-		for _, j := range typeDecl.Specs {
-			typeSpec, ok := j.(*ast.TypeSpec)
-			if !ok {
-				continue
-			}
-			structType, ok := typeSpec.Type.(*ast.StructType)
-			if !ok || structType.Incomplete {
-				continue
-			}
-			if typeSpec.Name.Name == ident {
-				return structType
-			}
-		}
-	}
-	return nil
-}
-
-func findFields(tagName string, modelDef *ast.StructType, fset *token.FileSet) ([]ASTField, error) {
-	fields := []ASTField{}
-	for _, field := range modelDef.Fields.List {
+func findFields(tagName string, structType *ast.StructType) ([]ASTField, error) {
+	var fields []ASTField
+	for _, field := range structType.Fields.List {
 		if field.Tag == nil {
 			continue
 		}
-		structTag := reflect.StructTag(strings.Trim(field.Tag.Value, "`"))
-		tagVal, ok := structTag.Lookup(tagName)
+		structTags := reflect.StructTag(strings.Trim(field.Tag.Value, "`"))
+		tagVal, ok := structTags.Lookup(tagName)
 		if !ok {
 			continue
 		}
 
 		if len(field.Names) != 1 {
-			return nil, fmt.Errorf("%w: Only one field allowed per tag", ErrInvalidValidator)
-		}
-
-		ident := field.Names[0].Name
-
-		goType := bytes.Buffer{}
-		if err := printer.Fprint(&goType, fset, field.Type); err != nil {
-			return nil, fmt.Errorf("Failed to print go struct field type for field %s: %w", ident, err)
+			return nil, kerrors.WithKind(nil, ErrorInvalidValidator{}, "Only one field allowed per tag")
 		}
 
 		m := ASTField{
-			Ident:  ident,
-			GoType: goType.String(),
-			Tags:   tagVal,
+			Ident: field.Names[0].Name,
+			Tags:  tagVal,
 		}
 		fields = append(fields, m)
 	}
 	return fields, nil
 }
 
-func parseValidationFields(astfields []ASTField) ([]ValidationField, error) {
-	if len(astfields) == 0 {
-		return nil, fmt.Errorf("%w: Validation struct does not contain any validated fields", ErrInvalidValidator)
-	}
+func parseValidationFields(astFields []ASTField) ([]ValidationField, error) {
+	fields := make([]ValidationField, 0, len(astFields))
 
-	fields := []ValidationField{}
-
-	for _, i := range astfields {
-		props := strings.SplitN(i.Tags, ",", 2)
-		if len(props[0]) == 0 {
-			return nil, fmt.Errorf("%w: Field tag must be fieldname[,flag] for field %s", ErrInvalidValidator, i.Ident)
+	for _, i := range astFields {
+		fieldname, tag, _ := strings.Cut(i.Tags, ",")
+		if fieldname == "" {
+			return nil, kerrors.WithKind(nil, ErrorInvalidValidator{}, fmt.Sprintf("Field tag must be fieldname[,flag] for field %s", i.Ident))
 		}
-		fieldname := strings.Title(props[0])
 		f := ValidationField{
-			Ident:  i.Ident,
-			GoType: i.GoType,
-			Key:    fieldname,
-			Has:    false,
-			Opt:    false,
+			Ident: i.Ident,
+			Key:   strings.Title(fieldname),
+			Has:   false,
+			Opt:   false,
 		}
-		if len(props) > 1 {
-			tags := strings.Split(props[1], ",")
-			tagflag, err := parseFlag(tags[0])
+		if tag != "" {
+			tagflag, err := parseFlag(tag)
 			if err != nil {
-				return nil, fmt.Errorf("Failed to parse flags for field %s: %w", f.Ident, err)
+				return nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse flags for field %s", f.Ident))
 			}
 			switch tagflag {
 			case flagHas:
-				if len(tags) != 1 {
-					return nil, fmt.Errorf("%w: Field tag must be fieldname,flag for field %s", ErrInvalidValidator, f.Ident)
-				}
 				f.Has = true
 			case flagOpt:
-				if len(tags) != 1 {
-					return nil, fmt.Errorf("%w: Field tag must be fieldname,flag for field %s", ErrInvalidValidator, f.Ident)
-				}
 				f.Opt = true
-			default:
-				if len(tags) != 1 {
-					return nil, fmt.Errorf("%w: Field tag must be fieldname,flag for field %s", ErrInvalidValidator, f.Ident)
-				}
 			}
 		}
 		fields = append(fields, f)
@@ -330,7 +302,8 @@ func parseValidationFields(astfields []ASTField) ([]ValidationField, error) {
 }
 
 const (
-	flagHas = iota
+	flagUnknown = iota
+	flagHas
 	flagOpt
 )
 
@@ -341,6 +314,6 @@ func parseFlag(flag string) (int, error) {
 	case "opt":
 		return flagOpt, nil
 	default:
-		return 0, fmt.Errorf("%w: Illegal flag %s", ErrInvalidValidator, flag)
+		return flagUnknown, kerrors.WithKind(nil, ErrorInvalidValidator{}, fmt.Sprintf("Illegal flag %s", flag))
 	}
 }
