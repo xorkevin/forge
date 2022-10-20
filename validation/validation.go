@@ -134,7 +134,7 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env execEnv) error 
 		}
 	}
 
-	astpkg, err := gopackages.ReadDir(inputfs, includePattern, ignorePattern)
+	astpkg, _, err := gopackages.ReadDir(inputfs, includePattern, ignorePattern)
 	if err != nil {
 		return err
 	}

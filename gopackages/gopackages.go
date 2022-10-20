@@ -27,10 +27,10 @@ func (e ErrorConflictingPackage) Error() string {
 	return "Conflicting package names"
 }
 
-func ReadDir(fsys fs.FS, include, ignore *regexp.Regexp) (*ast.Package, error) {
+func ReadDir(fsys fs.FS, include, ignore *regexp.Regexp) (*ast.Package, *token.FileSet, error) {
 	entries, err := fs.ReadDir(fsys, ".")
 	if err != nil {
-		return nil, kerrors.WithMsg(err, "Failed to read dir")
+		return nil, nil, kerrors.WithMsg(err, "Failed to read dir")
 	}
 	pkgName := ""
 	astfiles := map[string]*ast.File{}
@@ -54,19 +54,19 @@ func ReadDir(fsys fs.FS, include, ignore *regexp.Regexp) (*ast.Package, error) {
 		}
 		astfile, err := parseGoFile(fset, fsys, filename)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if pkgName == "" {
 			pkgName = astfile.Name.Name
 		} else if astfile.Name.Name != pkgName {
-			return nil, kerrors.WithKind(nil, ErrorConflictingPackage{}, "Conflicting package names")
+			return nil, nil, kerrors.WithKind(nil, ErrorConflictingPackage{}, "Conflicting package names")
 		}
 		astfiles[filename] = astfile
 	}
 	return &ast.Package{
 		Name:  pkgName,
 		Files: astfiles,
-	}, nil
+	}, fset, nil
 }
 
 func parseGoFile(fset *token.FileSet, fsys fs.FS, filename string) (*ast.File, error) {

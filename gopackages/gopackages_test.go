@@ -140,13 +140,14 @@ func TestReadDir(t *testing.T) {
 
 			assert := require.New(t)
 
-			pkg, err := ReadDir(tc.Fsys, tc.Include, tc.Ignore)
+			pkg, fset, err := ReadDir(tc.Fsys, tc.Include, tc.Ignore)
 			if tc.Err != nil {
 				assert.Error(err)
 				assert.ErrorIs(err, tc.Err)
 				return
 			}
 			assert.NoError(err)
+			assert.NotNil(fset)
 
 			assert.Len(pkg.Files, len(tc.Files))
 			for _, i := range tc.Files {
@@ -244,8 +245,9 @@ var (
 		},
 	}
 
-	astfiles, err := ReadDir(fsys, nil, nil)
+	astfiles, fset, err := ReadDir(fsys, nil, nil)
 	assert.NoError(err)
+	assert.NotNil(fset)
 
 	dirs := FindDirectives(astfiles, []string{"forge:abc", "forge:bc"})
 	assert.Len(dirs, 5)
