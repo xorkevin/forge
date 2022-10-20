@@ -81,16 +81,16 @@ type (
 		Version     string
 		Output      string
 		Prefix      string
-		Include     string
-		Ignore      string
-		Directive   string
 		PrefixValid string
 		PrefixHas   string
 		PrefixOpt   string
+		Include     string
+		Ignore      string
+		Directive   string
 		Tag         string
 	}
 
-	execEnv struct {
+	ExecEnv struct {
 		GoPackage string
 	}
 )
@@ -112,12 +112,12 @@ func Execute(opts Opts) error {
 		fmt.Sprintf("Source file: %s", gofile),
 	}, "; "))
 
-	return Generate(writefs.NewOS("."), os.DirFS("."), opts, execEnv{
+	return Generate(writefs.NewOS("."), os.DirFS("."), opts, ExecEnv{
 		GoPackage: gopackage,
 	})
 }
 
-func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env execEnv) error {
+func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) error {
 	var includePattern, ignorePattern *regexp.Regexp
 	if opts.Include != "" {
 		var err error
@@ -138,6 +138,10 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env execEnv) error 
 	if err != nil {
 		return err
 	}
+	if astpkg.Name != env.GoPackage {
+		return kerrors.WithKind(nil, ErrorEnv{}, "Environment variable GOPACKAGE does not match directory package")
+	}
+
 	directiveObjects := gopackages.FindDirectives(astpkg, []string{opts.Directive})
 	if len(directiveObjects) == 0 {
 		return kerrors.WithKind(nil, ErrorInvalidFile{}, "No validations found")

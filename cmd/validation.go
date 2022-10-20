@@ -11,12 +11,12 @@ var (
 	validationVerbose        bool
 	validationOutputFile     string
 	validationOutputPrefix   string
-	validationInclude        string
-	validationIgnore         string
-	validationDirective      string
 	validationValidatePrefix string
 	validationHasPrefix      string
 	validationOptPrefix      string
+	validationInclude        string
+	validationIgnore         string
+	validationDirective      string
 	validationTag            string
 )
 
@@ -107,12 +107,12 @@ The "opt" suffix is a feature designed to allow certain fields to be omitted.
 			Version:     versionString,
 			Output:      validationOutputFile,
 			Prefix:      validationOutputPrefix,
-			Include:     validationInclude,
-			Ignore:      validationIgnore,
-			Directive:   validationDirective,
 			PrefixValid: validationValidatePrefix,
 			PrefixHas:   validationHasPrefix,
 			PrefixOpt:   validationOptPrefix,
+			Include:     validationInclude,
+			Ignore:      validationIgnore,
+			Directive:   validationDirective,
 			Tag:         validationTag,
 		}); err != nil {
 			log.Fatalln(err)
@@ -124,14 +124,14 @@ The "opt" suffix is a feature designed to allow certain fields to be omitted.
 func init() {
 	rootCmd.AddCommand(validationCmd)
 
+	validationCmd.PersistentFlags().BoolVarP(&validationVerbose, "verbose", "v", false, "increase the verbosity of output")
 	validationCmd.PersistentFlags().StringVarP(&validationOutputFile, "output", "o", "validation_gen.go", "output filename")
 	validationCmd.PersistentFlags().StringVarP(&validationOutputPrefix, "prefix", "p", "valid", "prefix of identifiers in generated file")
-	validationCmd.PersistentFlags().StringVar(&validationInclude, "include", "", "regex for filenames of files that should be included")
-	validationCmd.PersistentFlags().StringVar(&validationIgnore, "ignore", "", "regex for filenames of files that should be ignored")
-	validationCmd.PersistentFlags().StringVar(&validationDirective, "directive", "forge:valid", "comment directive of types that should be validated")
 	validationCmd.PersistentFlags().StringVar(&validationValidatePrefix, "valid-prefix", "valid", "prefix of validation functions")
 	validationCmd.PersistentFlags().StringVar(&validationHasPrefix, "has-prefix", "validhas", "prefix of has functions")
 	validationCmd.PersistentFlags().StringVar(&validationOptPrefix, "opt-prefix", "validopt", "prefix of opt functions")
+	validationCmd.PersistentFlags().StringVar(&validationInclude, "include", "", "regex for filenames of files that should be included")
+	validationCmd.PersistentFlags().StringVar(&validationIgnore, "ignore", "", "regex for filenames of files that should be ignored")
+	validationCmd.PersistentFlags().StringVar(&validationDirective, "directive", "forge:valid", "comment directive of types that should be validated")
 	validationCmd.PersistentFlags().StringVar(&validationTag, "field-tag", "valid", "go struct field tag for defining validations")
-	validationCmd.PersistentFlags().BoolVarP(&validationVerbose, "verbose", "v", false, "increase the verbosity of output")
 }
