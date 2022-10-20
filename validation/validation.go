@@ -223,7 +223,7 @@ func parseDefinitions(directiveObjects []gopackages.DirectiveObject, validateTag
 		structName := typeSpec.Name.Name
 		structType, ok := typeSpec.Type.(*ast.StructType)
 		if !ok {
-			return nil, kerrors.WithMsg(nil, "Validation directive used on non-struct type declaration")
+			return nil, kerrors.WithKind(nil, ErrorInvalidFile{}, "Validation directive used on non-struct type declaration")
 		}
 		if structType.Incomplete {
 			return nil, kerrors.WithMsg(nil, "Unexpected incomplete struct definition")

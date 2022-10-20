@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"xorkevin.dev/forge/gopackages"
 	"xorkevin.dev/forge/writefs"
 )
 
@@ -86,6 +87,7 @@ type (
 	//forge:valid
 	reqUserGetID struct {
 		Userid string ` + "`" + `valid:"userid,has" json:"-"` + "`" + `
+		Other string
 	}
 )
 `),
@@ -149,7 +151,7 @@ func (r reqGetUsers) valid() error {
 			Err: ErrorInvalidFile{},
 		},
 		{
-			Name: "errors on validation directive on non-struct",
+			Name: "errors on validation directive on non-typedef",
 			Fsys: fstest.MapFS{
 				"stuff.go": &fstest.MapFile{
 					Data: []byte(`package somepackage
@@ -157,6 +159,116 @@ func (r reqGetUsers) valid() error {
 //forge:valid
 const (
 	foo = "bar"
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidFile{},
+		},
+		{
+			Name: "errors on validation tag on multiple fields",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:valid
+	reqUserGetID struct {
+		Userid, Other string ` + "`" + `valid:"userid,has" json:"-"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidValidator{},
+		},
+		{
+			Name: "errors on malformed validation tag",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:valid
+	reqUserGetID struct {
+		Userid string ` + "`" + `valid:"" json:"-"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidValidator{},
+		},
+		{
+			Name: "errors on invalid validation tag value",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:valid
+	reqUserGetID struct {
+		Userid string ` + "`" + `valid:"userid,bogus" json:"-"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidValidator{},
+		},
+		{
+			Name: "errors on no validation tags",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:valid
+	reqUserGetID struct {
+		Userid string
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidFile{},
+		},
+		{
+			Name: "errors on validation directive on non-struct",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:valid
+	reqUserGetID []string
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidFile{},
+		},
+		{
+			Name: "errors on validation directive on type alias",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:valid
+	reqUserGetID = string
 )
 `),
 					Mode:    filemode,
@@ -174,7 +286,7 @@ const (
 
 			outputfs := writefs.NewFSMock()
 			err := Generate(outputfs, tc.Fsys, Opts{
-				Verbose:     false,
+				Verbose:     true,
 				Version:     "dev",
 				Output:      "validation_gen.go",
 				Prefix:      "valid",
@@ -199,4 +311,104 @@ const (
 			}
 		})
 	}
+
+	t.Run("errors on invalid regex", func(t *testing.T) {
+		t.Parallel()
+
+		fsys := fstest.MapFS{
+			"stuff.go": &fstest.MapFile{
+				Data: []byte(`package somepackage
+`),
+				Mode:    filemode,
+				ModTime: now,
+			},
+		}
+
+		t.Run("invalid include", func(t *testing.T) {
+			t.Parallel()
+
+			assert := require.New(t)
+
+			outputfs := writefs.NewFSMock()
+			err := Generate(outputfs, fsys, Opts{
+				Verbose:     true,
+				Version:     "dev",
+				Output:      "validation_gen.go",
+				Prefix:      "valid",
+				PrefixValid: "valid",
+				PrefixHas:   "validhas",
+				PrefixOpt:   "validopt",
+				Include:     `\y`,
+				Ignore:      "",
+				Directive:   "forge:valid",
+				Tag:         "valid",
+			}, ExecEnv{
+				GoPackage: "somepackage",
+			})
+			assert.Error(err)
+		})
+
+		t.Run("invalid ignore", func(t *testing.T) {
+			t.Parallel()
+
+			assert := require.New(t)
+
+			outputfs := writefs.NewFSMock()
+			err := Generate(outputfs, fsys, Opts{
+				Verbose:     true,
+				Version:     "dev",
+				Output:      "validation_gen.go",
+				Prefix:      "valid",
+				PrefixValid: "valid",
+				PrefixHas:   "validhas",
+				PrefixOpt:   "validopt",
+				Include:     "",
+				Ignore:      `\y`,
+				Directive:   "forge:valid",
+				Tag:         "valid",
+			}, ExecEnv{
+				GoPackage: "somepackage",
+			})
+			assert.Error(err)
+		})
+	})
+
+	t.Run("reports ReadDir errors", func(t *testing.T) {
+		t.Parallel()
+
+		assert := require.New(t)
+
+		fsys := fstest.MapFS{
+			"stuff.go": &fstest.MapFile{
+				Data: []byte(`package somepackage
+`),
+				Mode:    filemode,
+				ModTime: now,
+			},
+			"other.go": &fstest.MapFile{
+				Data: []byte(`package different
+`),
+				Mode:    filemode,
+				ModTime: now,
+			},
+		}
+
+		outputfs := writefs.NewFSMock()
+		err := Generate(outputfs, fsys, Opts{
+			Verbose:     true,
+			Version:     "dev",
+			Output:      "validation_gen.go",
+			Prefix:      "valid",
+			PrefixValid: "valid",
+			PrefixHas:   "validhas",
+			PrefixOpt:   "validopt",
+			Include:     "",
+			Ignore:      "",
+			Directive:   "forge:valid",
+			Tag:         "valid",
+		}, ExecEnv{
+			GoPackage: "somepackage",
+		})
+		assert.ErrorIs(err, gopackages.ErrorConflictingPackage{})
+	})
 }

@@ -8,6 +8,7 @@ import (
 	"log"
 	"path"
 	"regexp"
+	"sort"
 	"strings"
 	"unicode"
 
@@ -151,8 +152,6 @@ func (v *pkgVisitor) Visit(node ast.Node) ast.Visitor {
 		return nil
 	}
 	switch n := node.(type) {
-	case *ast.Package:
-		return v
 	case *ast.File:
 		return v
 	case *ast.GenDecl:
@@ -210,6 +209,13 @@ func FindDirectives(pkg *ast.Package, sigils []string) []DirectiveObject {
 	visitor := &pkgVisitor{
 		sigils: sigils,
 	}
-	ast.Walk(visitor, pkg)
+	filenames := make([]string, 0, len(pkg.Files))
+	for k := range pkg.Files {
+		filenames = append(filenames, k)
+	}
+	sort.Strings(filenames)
+	for _, i := range filenames {
+		ast.Walk(visitor, pkg.Files[i])
+	}
 	return visitor.objs
 }
