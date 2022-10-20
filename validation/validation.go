@@ -186,7 +186,7 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) error 
 		if opts.Verbose {
 			log.Println("Detected validation " + i.Ident + " fields:")
 			for _, i := range i.Fields {
-				log.Printf("- %s %s\n", i.Ident, i.Key)
+				log.Printf("* %s %s\n", i.Ident, i.Key)
 			}
 		}
 		tplData := ValidationTemplateData{
