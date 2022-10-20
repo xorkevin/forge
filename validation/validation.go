@@ -42,36 +42,36 @@ func (e ErrorInvalidValidator) Error() string {
 }
 
 type (
-	ASTField struct {
+	astField struct {
 		Ident string
 		Tags  string
 	}
 
-	ValidationDef struct {
+	validationDef struct {
 		Ident  string
-		Fields []ValidationField
+		Fields []validationField
 	}
 
-	ValidationField struct {
+	validationField struct {
 		Ident string
 		Key   string
 		Has   bool
 		Opt   bool
 	}
 
-	MainTemplateData struct {
+	mainTemplateData struct {
 		Generator string
 		Version   string
 		Package   string
 	}
 
-	ValidationTemplateData struct {
+	validationTemplateData struct {
 		Prefix      string
 		Ident       string
 		PrefixValid string
 		PrefixHas   string
 		PrefixOpt   string
-		Fields      []ValidationField
+		Fields      []validationField
 	}
 )
 
@@ -154,17 +154,17 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) error 
 
 	tplmain, err := template.New("main").Parse(templateMain)
 	if err != nil {
-		return fmt.Errorf("Failed to parse template templateMain: %w", err)
+		return kerrors.WithMsg(err, "Failed to parse template templateMain")
 	}
 
 	tplvalidate, err := template.New("validate").Parse(templateValidate)
 	if err != nil {
-		return fmt.Errorf("Failed to parse template templateValidate: %w", err)
+		return kerrors.WithMsg(err, "Failed to parse template templateValidate")
 	}
 
 	file, err := outputfs.OpenFile(opts.Output, generatedFileFlag, generatedFileMode)
 	if err != nil {
-		return fmt.Errorf("Failed to write file %s: %w", opts.Output, err)
+		return kerrors.WithMsg(err, fmt.Sprintf("Failed to write file %s", opts.Output))
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
@@ -173,13 +173,13 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) error 
 	}()
 	fwriter := bufio.NewWriter(file)
 
-	tplData := MainTemplateData{
+	tplData := mainTemplateData{
 		Generator: "go generate forge validation",
 		Version:   opts.Version,
 		Package:   env.GoPackage,
 	}
 	if err := tplmain.Execute(fwriter, tplData); err != nil {
-		return fmt.Errorf("Failed to execute main validation template: %w", err)
+		return kerrors.WithMsg(err, "Failed to execute main validation template")
 	}
 
 	for _, i := range validations {
@@ -189,7 +189,7 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) error 
 				log.Printf("* %s %s\n", i.Ident, i.Key)
 			}
 		}
-		tplData := ValidationTemplateData{
+		tplData := validationTemplateData{
 			Prefix:      opts.Prefix,
 			Ident:       i.Ident,
 			PrefixValid: opts.PrefixValid,
@@ -198,20 +198,20 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) error 
 			Fields:      i.Fields,
 		}
 		if err := tplvalidate.Execute(fwriter, tplData); err != nil {
-			return fmt.Errorf("Failed to execute validation template for struct %s: %w", tplData.Ident, err)
+			return kerrors.WithMsg(err, fmt.Sprintf("Failed to execute validation template for struct %s", tplData.Ident))
 		}
 	}
 
 	if err := fwriter.Flush(); err != nil {
-		return fmt.Errorf("Failed to write to file %s: %w", opts.Output, err)
+		return kerrors.WithMsg(err, fmt.Sprintf("Failed to write to file %s", opts.Output))
 	}
 
 	log.Printf("Generated file: %s\n", opts.Output)
 	return nil
 }
 
-func parseDefinitions(directiveObjects []gopackages.DirectiveObject, validateTag string) ([]ValidationDef, error) {
-	var validationDefs []ValidationDef
+func parseDefinitions(directiveObjects []gopackages.DirectiveObject, validateTag string) ([]validationDef, error) {
+	var validationDefs []validationDef
 	for _, i := range directiveObjects {
 		if i.Kind != gopackages.ObjKindDeclType {
 			return nil, kerrors.WithKind(nil, ErrorInvalidFile{}, "Validation directive used on non-type declaration")
@@ -239,7 +239,7 @@ func parseDefinitions(directiveObjects []gopackages.DirectiveObject, validateTag
 		if err != nil {
 			return nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse validation fields for struct %s", structName))
 		}
-		validationDefs = append(validationDefs, ValidationDef{
+		validationDefs = append(validationDefs, validationDef{
 			Ident:  structName,
 			Fields: fields,
 		})
@@ -248,8 +248,8 @@ func parseDefinitions(directiveObjects []gopackages.DirectiveObject, validateTag
 	return validationDefs, nil
 }
 
-func findFields(tagName string, structType *ast.StructType) ([]ASTField, error) {
-	var fields []ASTField
+func findFields(tagName string, structType *ast.StructType) ([]astField, error) {
+	var fields []astField
 	for _, field := range structType.Fields.List {
 		if field.Tag == nil {
 			continue
@@ -264,7 +264,7 @@ func findFields(tagName string, structType *ast.StructType) ([]ASTField, error) 
 			return nil, kerrors.WithKind(nil, ErrorInvalidValidator{}, "Only one field allowed per tag")
 		}
 
-		m := ASTField{
+		m := astField{
 			Ident: field.Names[0].Name,
 			Tags:  tagVal,
 		}
@@ -273,15 +273,15 @@ func findFields(tagName string, structType *ast.StructType) ([]ASTField, error) 
 	return fields, nil
 }
 
-func parseValidationFields(astFields []ASTField) ([]ValidationField, error) {
-	fields := make([]ValidationField, 0, len(astFields))
+func parseValidationFields(astFields []astField) ([]validationField, error) {
+	fields := make([]validationField, 0, len(astFields))
 
 	for _, i := range astFields {
 		fieldname, tag, _ := strings.Cut(i.Tags, ",")
 		if fieldname == "" {
 			return nil, kerrors.WithKind(nil, ErrorInvalidValidator{}, fmt.Sprintf("Field tag must be fieldname[,flag] for field %s", i.Ident))
 		}
-		f := ValidationField{
+		f := validationField{
 			Ident: i.Ident,
 			Key:   strings.Title(fieldname),
 			Has:   false,

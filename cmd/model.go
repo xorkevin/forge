@@ -9,12 +9,14 @@ import (
 )
 
 var (
-	modelVerbose      bool
-	modelOutputFile   string
-	modelOutputPrefix string
-	modelModelName    string
-	modelModelTag     string
-	modelQueryTag     string
+	modelVerbose        bool
+	modelOutputFile     string
+	modelInclude        string
+	modelIgnore         string
+	modelDirective      string
+	modelQueryDirective string
+	modelModelTag       string
+	modelQueryTag       string
 )
 
 // modelCmd represents the model command
@@ -79,14 +81,15 @@ specified by column_name|cond. cond may be one of:
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := model.Execute(model.Opts{
-			Verbose:     modelVerbose,
-			Version:     versionString,
-			Output:      modelOutputFile,
-			Prefix:      modelOutputPrefix,
-			ModelIdent:  modelModelName,
-			QueryIdents: args,
-			ModelTag:    modelModelTag,
-			QueryTag:    modelQueryTag,
+			Verbose:        modelVerbose,
+			Version:        versionString,
+			Output:         modelOutputFile,
+			Include:        modelInclude,
+			Ignore:         modelIgnore,
+			ModelDirective: modelDirective,
+			QueryDirective: modelQueryDirective,
+			ModelTag:       modelModelTag,
+			QueryTag:       modelQueryTag,
 		}); err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -98,12 +101,12 @@ specified by column_name|cond. cond may be one of:
 func init() {
 	rootCmd.AddCommand(modelCmd)
 
+	modelCmd.PersistentFlags().BoolVarP(&modelVerbose, "verbose", "v", false, "increase the verbosity of output")
 	modelCmd.PersistentFlags().StringVarP(&modelOutputFile, "output", "o", "model_gen.go", "output filename")
-	modelCmd.PersistentFlags().StringVarP(&modelOutputPrefix, "prefix", "p", "", "prefix of identifiers in generated file")
-	modelCmd.MarkPersistentFlagRequired("prefix")
-	modelCmd.PersistentFlags().StringVarP(&modelModelName, "model", "m", "", "name of the model identifier")
-	modelCmd.MarkPersistentFlagRequired("model")
+	validationCmd.PersistentFlags().StringVar(&modelInclude, "include", "", "regex for filenames of files that should be included")
+	validationCmd.PersistentFlags().StringVar(&modelIgnore, "ignore", "", "regex for filenames of files that should be ignored")
+	modelCmd.PersistentFlags().StringVar(&modelDirective, "model-directive", "forge:model", "comment directive of types that are models")
+	modelCmd.PersistentFlags().StringVar(&modelQueryDirective, "query-directive", "forge:model:query", "comment directive of types that are model queries")
 	modelCmd.PersistentFlags().StringVar(&modelModelTag, "model-tag", "model", "go struct tag for defining model fields")
 	modelCmd.PersistentFlags().StringVar(&modelQueryTag, "query-tag", "query", "go struct tag for defining query fields")
-	modelCmd.PersistentFlags().BoolVarP(&modelVerbose, "verbose", "v", false, "increase the verbosity of output")
 }

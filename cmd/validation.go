@@ -26,6 +26,11 @@ var validationCmd = &cobra.Command{
 	Short: "Generates validations",
 	Long: `Generates common validation on go structs
 
+forge validation is called with the following environment variables:
+
+	GOPACKAGE: name of the go package
+	GOFILE: name of the go source file
+
 forge validation code generates a validation method for structs, where for
 every struct field tagged with valid, a function based on the tag value will be
 called.

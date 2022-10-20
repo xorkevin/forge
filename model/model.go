@@ -3,20 +3,21 @@ package model
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"fmt"
 	"go/ast"
-	"go/parser"
 	"go/printer"
 	"go/token"
 	"io/fs"
 	"log"
 	"os"
 	"reflect"
+	"regexp"
 	"strings"
 	"text/template"
 
+	"xorkevin.dev/forge/gopackages"
 	"xorkevin.dev/forge/writefs"
+	"xorkevin.dev/kerrors"
 )
 
 const (
@@ -24,40 +25,55 @@ const (
 	generatedFileFlag = os.O_WRONLY | os.O_TRUNC | os.O_CREATE
 )
 
-var (
-	// ErrEnv is returned when model is run outside of go generate
-	ErrEnv = errors.New("Invalid execution environment")
-	// ErrInvalidFile is returned when parsing an invalid model file
-	ErrInvalidFile = errors.New("Invalid model file")
-	// ErrInvalidModel is returned when parsing a model with invalid syntax
-	ErrInvalidModel = errors.New("Invalid model")
+type (
+	// ErrorEnv is returned when validation is run outside of go generate
+	ErrorEnv struct{}
+	// ErrorInvalidFile is returned when parsing an invalid validation file
+	ErrorInvalidFile struct{}
+	// ErrorInvalidModel is returned when parsing a model with invalid syntax
+	ErrorInvalidModel struct{}
 )
 
+func (e ErrorEnv) Error() string {
+	return "Invalid execution environment"
+}
+func (e ErrorInvalidFile) Error() string {
+	return "Invalid file"
+}
+func (e ErrorInvalidModel) Error() string {
+	return "Invalid validator"
+}
+
 type (
-	ASTField struct {
+	dirObjPair struct {
+		Dir gopackages.DirectiveInstance
+		Obj gopackages.DirectiveObject
+	}
+
+	astField struct {
 		Ident  string
 		GoType string
 		Tags   string
 	}
 
-	ModelDef struct {
+	modelDef struct {
 		Ident    string
-		Fields   []ModelField
-		Indicies [][]ModelField
+		Fields   []modelField
+		Indicies [][]modelField
+	}
+
+	modelField struct {
+		Ident  string
+		GoType string
+		DBName string
+		DBType string
+		Num    int
 	}
 
 	QueryDef struct {
 		Ident       string
 		Fields      []QueryField
 		QueryFields []QueryField
-	}
-
-	ModelField struct {
-		Ident  string
-		GoType string
-		DBName string
-		DBType string
-		Num    int
 	}
 
 	QueryField struct {
@@ -72,7 +88,7 @@ type (
 
 	CondField struct {
 		Kind  CondType
-		Field ModelField
+		Field modelField
 	}
 
 	ModelIndex struct {
@@ -131,19 +147,19 @@ type (
 
 type (
 	Opts struct {
-		Verbose     bool
-		Version     string
-		Output      string
-		Prefix      string
-		ModelIdent  string
-		QueryIdents []string
-		ModelTag    string
-		QueryTag    string
+		Verbose        bool
+		Version        string
+		Output         string
+		Include        string
+		Ignore         string
+		ModelDirective string
+		QueryDirective string
+		ModelTag       string
+		QueryTag       string
 	}
 
-	execEnv struct {
+	ExecEnv struct {
 		GoPackage string
-		GoFile    string
 	}
 )
 
@@ -151,31 +167,74 @@ type (
 func Execute(opts Opts) error {
 	gopackage := os.Getenv("GOPACKAGE")
 	if len(gopackage) == 0 {
-		return fmt.Errorf("%w: Environment variable GOPACKAGE not provided by go generate", ErrEnv)
+		return kerrors.WithKind(nil, ErrorEnv{}, "Environment variable GOPACKAGE not provided by go generate")
 	}
 	gofile := os.Getenv("GOFILE")
 	if len(gofile) == 0 {
-		return fmt.Errorf("%w: Environment variable GOFILE not provided by go generate", ErrEnv)
+		return kerrors.WithKind(nil, ErrorEnv{}, "Environment variable GOFILE not provided by go generate")
 	}
 
-	return Generate(writefs.NewOS("."), os.DirFS("."), opts, execEnv{
+	log.Println(strings.Join([]string{
+		"Generating model",
+		fmt.Sprintf("Package: %s", gopackage),
+		fmt.Sprintf("Source file: %s", gofile),
+	}, "; "))
+
+	return Generate(writefs.NewOS("."), os.DirFS("."), opts, ExecEnv{
 		GoPackage: gopackage,
-		GoFile:    gofile,
 	})
 }
 
-func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env execEnv) error {
-	fmt.Println(strings.Join([]string{
-		"Generating model",
-		fmt.Sprintf("Package: %s", env.GoPackage),
-		fmt.Sprintf("Source file: %s", env.GoFile),
-		fmt.Sprintf("Model ident: %s", opts.ModelIdent),
-		fmt.Sprintf("Additional queries: %s", strings.Join(opts.QueryIdents, ", ")),
-	}, "; "))
+func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) error {
+	var includePattern, ignorePattern *regexp.Regexp
+	if opts.Include != "" {
+		var err error
+		includePattern, err = regexp.Compile(opts.Include)
+		if err != nil {
+			return kerrors.WithMsg(err, "Invalid include regex")
+		}
+	}
+	if opts.Ignore != "" {
+		var err error
+		ignorePattern, err = regexp.Compile(opts.Ignore)
+		if err != nil {
+			return kerrors.WithMsg(err, "Invalid ignore regex")
+		}
+	}
 
-	modelDef, queryDefs, err := parseDefinitions(inputfs, env.GoFile, opts.ModelIdent, opts.QueryIdents, opts.ModelTag, opts.QueryTag)
+	astpkg, fset, err := gopackages.ReadDir(inputfs, includePattern, ignorePattern)
 	if err != nil {
-		return fmt.Errorf("Failed to parse model and query definitions: %w", err)
+		return err
+	}
+	if astpkg.Name != env.GoPackage {
+		return kerrors.WithKind(nil, ErrorEnv{}, "Environment variable GOPACKAGE does not match directory package")
+	}
+
+	directiveObjects := gopackages.FindDirectives(astpkg, []string{opts.ModelDirective, opts.QueryDirective})
+	var modelObjects, queryObjects []dirObjPair
+	for _, i := range directiveObjects {
+		for _, j := range i.Directives {
+			switch j.Sigil {
+			case opts.ModelDirective:
+				modelObjects = append(modelObjects, dirObjPair{
+					Dir: j,
+					Obj: i,
+				})
+			case opts.QueryDirective:
+				queryObjects = append(queryObjects, dirObjPair{
+					Dir: j,
+					Obj: i,
+				})
+			}
+		}
+	}
+	if len(modelObjects) == 0 {
+		return kerrors.WithKind(nil, ErrorInvalidFile{}, "No models found")
+	}
+
+	modelDefs, err := parseModelDefinitions(modelObjects, opts.ModelTag, fset)
+	if err != nil {
+		return err
 	}
 
 	tplmodel, err := template.New("model").Parse(templateModel)
@@ -285,98 +344,70 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env execEnv) error 
 	return nil
 }
 
-func parseDefinitions(inputfs fs.FS, gofile string, modelIdent string, queryIdents []string, modelTag string, queryTag string) (*ModelDef, []QueryDef, error) {
-	fset := token.NewFileSet()
-	var root *ast.File
-	if err := func() error {
-		file, err := inputfs.Open(gofile)
-		if err != nil {
-			return fmt.Errorf("Failed reading file %s: %w", gofile, err)
-		}
-		defer func() {
-			if err := file.Close(); err != nil {
-				log.Printf("Failed to close open file %s: %v", gofile, err)
-			}
-		}()
-		root, err = parser.ParseFile(fset, "", file, parser.AllErrors)
-		if err != nil {
-			return fmt.Errorf("Failed to parse file %s: %w", gofile, err)
-		}
-		return nil
-	}(); err != nil {
-		return nil, nil, err
-	}
-	if root.Decls == nil {
-		return nil, nil, fmt.Errorf("%w: No top level declarations in %s", ErrInvalidFile, gofile)
-	}
+func parseModelDefinitions(modelObjects []dirObjPair, modelTag string, fset *token.FileSet) ([]modelDef, error) {
+	modelDefs := make([]modelDef, 0, len(modelObjects))
 
-	modelStruct := findStruct(modelIdent, root.Decls)
-	if modelStruct == nil {
-		return nil, nil, fmt.Errorf("%w: Struct %s not found in %s", ErrInvalidFile, modelIdent, gofile)
-	}
-	modelASTFields, err := findFields(modelTag, modelStruct, fset)
-	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to parse model struct %s: %w", modelIdent, err)
-	}
-	modelFields, seenFields, indicies, err := parseModelFields(modelASTFields)
-	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to parse model fields for struct %s: %w", modelIdent, err)
-	}
-
-	queryDefs := []QueryDef{}
-	for _, ident := range queryIdents {
-		queryStruct := findStruct(ident, root.Decls)
-		if queryStruct == nil {
-			return nil, nil, fmt.Errorf("%w: Struct %s not found in %s", ErrInvalidFile, ident, gofile)
+	for _, i := range modelObjects {
+		if i.Obj.Kind != gopackages.ObjKindDeclType {
+			return nil, kerrors.WithKind(nil, ErrorInvalidFile{}, "Model directive used on non-type declaration")
 		}
-		queryASTFields, err := findFields(queryTag, queryStruct, fset)
+		typeSpec, ok := i.Obj.Obj.(*ast.TypeSpec)
+		if !ok {
+			return nil, kerrors.WithMsg(nil, "Unexpected directive object type")
+		}
+		structName := typeSpec.Name.Name
+		structType, ok := typeSpec.Type.(*ast.StructType)
+		if !ok {
+			return nil, kerrors.WithKind(nil, ErrorInvalidFile{}, "Model directive used on non-struct type declaration")
+		}
+		if structType.Incomplete {
+			return nil, kerrors.WithMsg(nil, "Unexpected incomplete struct definition")
+		}
+		astFields, err := findFields(modelTag, structType, fset)
 		if err != nil {
-			return nil, nil, fmt.Errorf("Failed to parse query struct %s: %w", ident, err)
+			return nil, err
 		}
-		fields, queries, err := parseQueryFields(queryASTFields, seenFields)
+		if len(astFields) == 0 {
+			return nil, kerrors.WithKind(nil, ErrorInvalidFile{}, "No model fields found on struct")
+		}
+		modelFields, indicies, err := parseModelFields(astFields)
 		if err != nil {
-			return nil, nil, fmt.Errorf("Failed to parse query fields for struct %s: %w", ident, err)
+			return nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse model fields for struct %s", structName))
 		}
-		queryDefs = append(queryDefs, QueryDef{
-			Ident:       ident,
-			Fields:      fields,
-			QueryFields: queries,
+		modelDefs = append(modelDefs, modelDef{
+			Ident:    structName,
+			Fields:   modelFields,
+			Indicies: indicies,
 		})
 	}
 
-	return &ModelDef{
-		Ident:    modelIdent,
-		Fields:   modelFields,
-		Indicies: indicies,
-	}, queryDefs, nil
+	return modelDefs, nil
+
+	//queryDefs := []QueryDef{}
+	//for _, ident := range queryIdents {
+	//	queryStruct := findStruct(ident, root.Decls)
+	//	if queryStruct == nil {
+	//		return nil, nil, fmt.Errorf("%w: Struct %s not found in %s", ErrInvalidFile, ident, gofile)
+	//	}
+	//	queryASTFields, err := findFields(queryTag, queryStruct, fset)
+	//	if err != nil {
+	//		return nil, nil, fmt.Errorf("Failed to parse query struct %s: %w", ident, err)
+	//	}
+	//	fields, queries, err := parseQueryFields(queryASTFields, seenFields)
+	//	if err != nil {
+	//		return nil, nil, fmt.Errorf("Failed to parse query fields for struct %s: %w", ident, err)
+	//	}
+	//	queryDefs = append(queryDefs, QueryDef{
+	//		Ident:       ident,
+	//		Fields:      fields,
+	//		QueryFields: queries,
+	//	})
+	//}
 }
 
-func findStruct(ident string, decls []ast.Decl) *ast.StructType {
-	for _, i := range decls {
-		typeDecl, ok := i.(*ast.GenDecl)
-		if !ok || typeDecl.Tok != token.TYPE {
-			continue
-		}
-		for _, j := range typeDecl.Specs {
-			typeSpec, ok := j.(*ast.TypeSpec)
-			if !ok {
-				continue
-			}
-			structType, ok := typeSpec.Type.(*ast.StructType)
-			if !ok || structType.Incomplete {
-				continue
-			}
-			if typeSpec.Name.Name == ident {
-				return structType
-			}
-		}
-	}
-	return nil
-}
-
-func findFields(tagName string, modelDef *ast.StructType, fset *token.FileSet) ([]ASTField, error) {
-	fields := []ASTField{}
-	for _, field := range modelDef.Fields.List {
+func findFields(tagName string, structType *ast.StructType, fset *token.FileSet) ([]astField, error) {
+	var fields []astField
+	for _, field := range structType.Fields.List {
 		if field.Tag == nil {
 			continue
 		}
@@ -387,17 +418,17 @@ func findFields(tagName string, modelDef *ast.StructType, fset *token.FileSet) (
 		}
 
 		if len(field.Names) != 1 {
-			return nil, fmt.Errorf("%w: Only one field allowed per tag", ErrInvalidModel)
+			return nil, kerrors.WithKind(nil, ErrorInvalidModel{}, "Only one field allowed per tag")
 		}
 
 		ident := field.Names[0].Name
 
 		goType := bytes.Buffer{}
 		if err := printer.Fprint(&goType, fset, field.Type); err != nil {
-			return nil, fmt.Errorf("Failed to print go struct field type for field %s: %w", ident, err)
+			return nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to print go struct field type for field %s", ident))
 		}
 
-		m := ASTField{
+		m := astField{
 			Ident:  ident,
 			GoType: goType.String(),
 			Tags:   tagVal,
@@ -407,68 +438,81 @@ func findFields(tagName string, modelDef *ast.StructType, fset *token.FileSet) (
 	return fields, nil
 }
 
-func parseModelFields(astfields []ASTField) ([]ModelField, map[string]ModelField, [][]ModelField, error) {
-	if len(astfields) == 0 {
-		return nil, nil, nil, fmt.Errorf("%w: Model struct does not contain any model fields", ErrInvalidModel)
-	}
+func parseModelFields(astfields []astField) ([]modelField, [][]modelField, error) {
+	fields := make([]modelField, 0, len(astfields))
+	seenFields := map[string]modelField{}
+	var tagIndicies [][]string
 
-	seenFields := map[string]ModelField{}
-	tagIndicies := [][]string{}
-
-	fields := []ModelField{}
 	for n, i := range astfields {
-		tags := strings.SplitN(i.Tags, ",", 2)
-		if len(tags) < 2 {
-			return nil, nil, nil, fmt.Errorf("%w: Model field tag must be dbname,dbtype[;opt[,fields ...][; ...]] for field %s", ErrInvalidModel, i.Ident)
-		}
-		dbName := tags[0]
-		opts := strings.Split(tags[1], ";")
-		dbType := opts[0]
-		if len(dbName) == 0 {
-			return nil, nil, nil, fmt.Errorf("%w: %s dbname not set", ErrInvalidModel, i.Ident)
-		}
-		if len(dbType) == 0 {
-			return nil, nil, nil, fmt.Errorf("%w: %s dbtype not set", ErrInvalidModel, i.Ident)
+		dbstr, rest, _ := strings.Cut(i.Tags, ";")
+		dbName, dbType, ok := strings.Cut(dbstr, ",")
+		if !ok || dbName == "" || dbType == "" {
+			return nil, nil, kerrors.WithKind(nil, ErrorInvalidModel{}, fmt.Sprintf("Model field tag must be dbname,dbtype[;opt[,fields ...][; ...]] on field %s", i.Ident))
 		}
 		if dup, ok := seenFields[dbName]; ok {
-			return nil, nil, nil, fmt.Errorf("%w: Duplicate field %s on %s and %s", ErrInvalidModel, dbName, i.Ident, dup.Ident)
+			return nil, nil, kerrors.WithKind(nil, ErrorInvalidModel{}, fmt.Sprintf("Duplicate field %s on %s and %s", dbName, i.Ident, dup.Ident))
 		}
-		f := ModelField{
+		f := modelField{
 			Ident:  i.Ident,
 			GoType: i.GoType,
 			DBName: dbName,
 			DBType: dbType,
 			Num:    n + 1,
 		}
-		for _, i := range opts[1:] {
-			tags := strings.Split(i, ",")
-			opt, err := parseModelOpt(tags[0])
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("Failed to parse model opt for field %s: %w", f.Ident, err)
-			}
-			switch opt {
-			case optIndex:
-				tagIndicies = append(tagIndicies, append(tags[1:], dbName))
-			}
-		}
 		seenFields[dbName] = f
 		fields = append(fields, f)
+		var opts []string
+		if rest != "" {
+			opts = strings.Split(rest, ";")
+		}
+		for _, i := range opts {
+			opt := strings.Split(i, ",")
+			optflag, err := parseModelOpt(opt[0])
+			if err != nil {
+				return nil, nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse model opt for field %s", f.Ident))
+			}
+			switch optflag {
+			case modelOptIndex:
+				args := make([]string, len(opt))
+				copy(args, opt[1:])
+				args[len(args)-1] = dbName
+				tagIndicies = append(tagIndicies, args)
+			}
+		}
 	}
 
-	indicies := [][]ModelField{}
+	indicies := [][]modelField{}
 	for _, i := range tagIndicies {
-		k := make([]ModelField, 0, len(i))
+		k := make([]modelField, 0, len(i))
 		for _, j := range i {
 			f, ok := seenFields[j]
 			if !ok {
-				return nil, nil, nil, fmt.Errorf("%w: No field %s for index", ErrInvalidModel, j)
+				return nil, nil, kerrors.WithKind(nil, ErrorInvalidModel{}, fmt.Sprintf("No field %s for index", j))
 			}
 			k = append(k, f)
 		}
 		indicies = append(indicies, k)
 	}
 
-	return fields, seenFields, indicies, nil
+	return fields, indicies, nil
+}
+
+type (
+	modelOpt int
+)
+
+const (
+	modelOptUnknown modelOpt = iota
+	modelOptIndex
+)
+
+func parseModelOpt(opt string) (modelOpt, error) {
+	switch opt {
+	case "index":
+		return modelOptIndex, nil
+	default:
+		return modelOptUnknown, kerrors.WithKind(nil, ErrorInvalidModel{}, fmt.Sprintf("Illegal opt %s", opt))
+	}
 }
 
 func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([]QueryField, []QueryField, error) {
@@ -539,23 +583,6 @@ func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([
 	}
 
 	return fields, queryFields, nil
-}
-
-type (
-	ModelOpt int
-)
-
-const (
-	optIndex ModelOpt = iota
-)
-
-func parseModelOpt(opt string) (ModelOpt, error) {
-	switch opt {
-	case "index":
-		return optIndex, nil
-	default:
-		return 0, fmt.Errorf("%w: Illegal opt %s", ErrInvalidModel, opt)
-	}
 }
 
 type (
@@ -644,7 +671,7 @@ func dbTypeIsArray(dbType string) bool {
 	return strings.Contains(dbType, "ARRAY")
 }
 
-func (m *ModelDef) genModelSQL() ModelSQLStrings {
+func (m *modelDef) genModelSQL() ModelSQLStrings {
 	colNum := len(m.Fields)
 	sqlDefs := make([]string, 0, colNum)
 	sqlDBNames := make([]string, 0, colNum)
