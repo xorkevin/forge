@@ -201,7 +201,9 @@ type (
 
 	// Another is a struct
 	//forge:abc
-	Another struct {}
+	Another struct{}
+
+	Again struct{}
 )
 
 // constants here

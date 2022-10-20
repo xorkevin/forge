@@ -168,7 +168,7 @@ func (v *pkgVisitor) Visit(node ast.Node) ast.Visitor {
 			case token.VAR:
 				kind = ObjKindGroupVar
 			}
-			if kind != ObjKindUnknown {
+			if kind != ObjKindUnknown && n.Doc != nil {
 				visitor := &docCommentVisitor{
 					sigils: v.sigils,
 				}
@@ -185,6 +185,9 @@ func (v *pkgVisitor) Visit(node ast.Node) ast.Visitor {
 		}
 	case *ast.TypeSpec:
 		{
+			if n.Doc == nil {
+				return nil
+			}
 			visitor := &docCommentVisitor{
 				sigils: v.sigils,
 			}
