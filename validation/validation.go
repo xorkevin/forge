@@ -168,7 +168,7 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) error 
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			log.Printf("Failed to close open file %s: %v", opts.Output, err)
+			log.Printf("Failed to close open file %s: %v\n", opts.Output, err)
 		}
 	}()
 	fwriter := bufio.NewWriter(file)
@@ -184,7 +184,7 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) error 
 
 	for _, i := range validations {
 		if opts.Verbose {
-			log.Println("Detected validation " + i.Ident + " fields:")
+			log.Printf("Detected validation %s fields:\n", i.Ident)
 			for _, i := range i.Fields {
 				log.Printf("* %s %s\n", i.Ident, i.Key)
 			}

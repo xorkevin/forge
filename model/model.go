@@ -12,6 +12,7 @@ import (
 	"os"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -84,39 +85,40 @@ type (
 		DBName string
 		Num    int
 		Mode   queryOpt
-		Cond   []CondField
+		Cond   []condField
 	}
 
-	CondField struct {
-		Kind  CondType
+	condField struct {
+		Kind  condType
 		Field modelField
 	}
 
-	ModelIndex struct {
-		Name    string
-		Columns string
+	mainTemplateData struct {
+		Generator string
+		Version   string
+		Package   string
 	}
 
-	ModelSQLStrings struct {
+	modelTemplateData struct {
+		Prefix     string
+		ModelIdent string
+		SQL        modelSQLStrings
+	}
+
+	modelSQLStrings struct {
 		Setup            string
 		DBNames          string
 		Placeholders     string
 		PlaceholderTpl   string
 		PlaceholderCount string
 		Idents           string
-		IdentRefs        string
-		Indicies         []ModelIndex
+		Indicies         []modelIndex
 		ColNum           string
 	}
 
-	ModelTemplateData struct {
-		Generator  string
-		Version    string
-		Package    string
-		Prefix     string
-		Imports    string
-		ModelIdent string
-		SQL        ModelSQLStrings
+	modelIndex struct {
+		Name    string
+		Columns string
 	}
 
 	QuerySQLStrings struct {
@@ -140,7 +142,7 @@ type (
 	QueryTemplateData struct {
 		Prefix       string
 		ModelIdent   string
-		PrimaryField QueryField
+		PrimaryField queryField
 		SQL          QuerySQLStrings
 		SQLCond      QueryCondSQLStrings
 	}
@@ -237,67 +239,87 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) error 
 	if err != nil {
 		return err
 	}
+	modelDefMap := map[string]modelDef{}
+	for _, i := range modelDefs {
+		modelDefMap[i.Prefix] = i
+	}
+	queryDefs, err := parseQueryDefinitions(queryObjects, opts.QueryTag, modelDefMap, fset)
+	if err != nil {
+		return err
+	}
 
+	tplmain, err := template.New("main").Parse(templateMain)
+	if err != nil {
+		return kerrors.WithMsg(err, "Failed to parse template templateMain")
+	}
 	tplmodel, err := template.New("model").Parse(templateModel)
 	if err != nil {
-		return fmt.Errorf("Failed to parse template templateModel: %w", err)
+		return kerrors.WithMsg(err, "Failed to parse template templateModel")
 	}
-	tplgetoneeq, err := template.New("getoneeq").Parse(templateGetOneEq)
+	tplQuery := map[queryOpt]*template.Template{}
+	tplQuery[queryOptGetOneEq], err = template.New("getoneeq").Parse(templateGetOneEq)
 	if err != nil {
-		return fmt.Errorf("Failed to parse template templateGetOneEq: %w", err)
+		return kerrors.WithMsg(err, "Failed to parse template templateGetOneEq")
 	}
-	tplgetgroup, err := template.New("getgroup").Parse(templateGetGroup)
+	tplQuery[queryOptGetGroup], err = template.New("getgroup").Parse(templateGetGroup)
 	if err != nil {
-		return fmt.Errorf("Failed to parse template templateGetGroup: %w", err)
+		return kerrors.WithMsg(err, "Failed to parse template templateGetGroup")
 	}
-	tplgetgroupeq, err := template.New("getgroupeq").Parse(templateGetGroupEq)
+	tplQuery[queryOptGetGroupEq], err = template.New("getgroupeq").Parse(templateGetGroupEq)
 	if err != nil {
-		return fmt.Errorf("Failed to parse template templateGetGroupEq: %w", err)
+		return kerrors.WithMsg(err, "Failed to parse template templateGetGroupEq")
 	}
-	tplupdeq, err := template.New("updeq").Parse(templateUpdEq)
+	tplQuery[queryOptUpdEq], err = template.New("updeq").Parse(templateUpdEq)
 	if err != nil {
-		return fmt.Errorf("Failed to parse template templateUpdEq: %w", err)
+		return kerrors.WithMsg(err, "Failed to parse template templateUpdEq")
 	}
-	tpldeleq, err := template.New("deleq").Parse(templateDelEq)
+	tplQuery[queryOptDelEq], err = template.New("deleq").Parse(templateDelEq)
 	if err != nil {
-		return fmt.Errorf("Failed to parse template templateDelEq: %w", err)
+		return kerrors.WithMsg(err, "Failed to parse template templateDelEq")
 	}
 
 	file, err := outputfs.OpenFile(opts.Output, generatedFileFlag, generatedFileMode)
 	if err != nil {
-		return fmt.Errorf("Failed to write file %s: %w", opts.Output, err)
+		return kerrors.WithMsg(err, fmt.Sprintf("Failed to write file %s", opts.Output))
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			log.Printf("Failed to close open file %s: %v", opts.Output, err)
+			log.Printf("Failed to close open file %s: %v\n", opts.Output, err)
 		}
 	}()
 	fwriter := bufio.NewWriter(file)
 
-	tplData := ModelTemplateData{
-		Generator:  "go generate forge model",
-		Version:    opts.Version,
-		Package:    env.GoPackage,
-		Prefix:     opts.Prefix,
-		ModelIdent: modelDef.Ident,
-		SQL:        modelDef.genModelSQL(),
+	tplData := mainTemplateData{
+		Generator: "go generate forge model",
+		Version:   opts.Version,
+		Package:   env.GoPackage,
 	}
-	if err := tplmodel.Execute(fwriter, tplData); err != nil {
-		return fmt.Errorf("Failed to execute model template for struct %s: %w", modelDef.Ident, err)
+	if err := tplmain.Execute(fwriter, tplData); err != nil {
+		return kerrors.WithMsg(err, "Failed to execute main model template")
 	}
 
-	if opts.Verbose {
-		fmt.Println("Detected model fields:")
-		for _, i := range modelDef.Fields {
-			fmt.Printf("- %s %s\n", i.Ident, i.GoType)
+	for _, i := range modelDefs {
+		if opts.Verbose {
+			log.Printf("Detected model %s with fields:\n", i.Ident)
+			for _, i := range i.Fields {
+				log.Printf("* %s %s\n", i.Ident, i.GoType)
+			}
+		}
+		tplData := modelTemplateData{
+			Prefix:     i.Prefix,
+			ModelIdent: i.Ident,
+			SQL:        i.genModelSQL(),
+		}
+		if err := tplmodel.Execute(fwriter, tplData); err != nil {
+			return kerrors.WithMsg(err, fmt.Sprintf("Failed to execute model template for struct %s", i.Ident))
 		}
 	}
 
 	for _, queryDef := range queryDefs {
 		if opts.Verbose {
-			fmt.Println("Detected query " + queryDef.Ident + " fields:")
+			log.Println("Detected query " + queryDef.Ident + " fields:")
 			for _, i := range queryDef.Fields {
-				fmt.Printf("- %s %s\n", i.Ident, i.GoType)
+				log.Printf("* %s %s\n", i.Ident, i.GoType)
 			}
 		}
 		querySQLStrings := queryDef.genQuerySQL()
@@ -312,37 +334,80 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) error 
 			case flagGetOneEq:
 				tplData.SQLCond = i.genQueryCondSQL(0)
 				if err := tplgetoneeq.Execute(fwriter, tplData); err != nil {
-					return fmt.Errorf("Failed to execute getoneeq template for field %s on struct %s: %w", tplData.PrimaryField.Ident, tplData.ModelIdent, err)
+					return kerrors.WithMsg(err, "Failed to execute getoneeq template for field %s on struct %s: %w", tplData.PrimaryField.Ident, tplData.ModelIdent, err)
 				}
 			case flagGetGroup:
 				if err := tplgetgroup.Execute(fwriter, tplData); err != nil {
-					return fmt.Errorf("Failed to execute getgroup template for field %s on struct %s: %w", tplData.PrimaryField.Ident, tplData.ModelIdent, err)
+					return kerrors.WithMsg(err, "Failed to execute getgroup template for field %s on struct %s: %w", tplData.PrimaryField.Ident, tplData.ModelIdent, err)
 				}
 			case flagGetGroupEq:
 				tplData.SQLCond = i.genQueryCondSQL(2)
 				if err := tplgetgroupeq.Execute(fwriter, tplData); err != nil {
-					return fmt.Errorf("Failed to execute getgroupeq template for field %s on struct %s: %w", tplData.PrimaryField.Ident, tplData.ModelIdent, err)
+					return kerrors.WithMsg(err, "Failed to execute getgroupeq template for field %s on struct %s: %w", tplData.PrimaryField.Ident, tplData.ModelIdent, err)
 				}
 			case flagUpdEq:
 				tplData.SQLCond = i.genQueryCondSQL(len(queryDef.Fields))
 				if err := tplupdeq.Execute(fwriter, tplData); err != nil {
-					return fmt.Errorf("Failed to execute updeq template for field %s on struct %s: %w", tplData.PrimaryField.Ident, tplData.ModelIdent, err)
+					return kerrors.WithMsg(err, "Failed to execute updeq template for field %s on struct %s: %w", tplData.PrimaryField.Ident, tplData.ModelIdent, err)
 				}
 			case flagDelEq:
 				tplData.SQLCond = i.genQueryCondSQL(0)
 				if err := tpldeleq.Execute(fwriter, tplData); err != nil {
-					return fmt.Errorf("Failed to execute deleq template for field %s on struct %s: %w", tplData.PrimaryField.Ident, tplData.ModelIdent, err)
+					return kerrors.WithMsg(err, "Failed to execute deleq template for field %s on struct %s: %w", tplData.PrimaryField.Ident, tplData.ModelIdent, err)
 				}
 			}
 		}
 	}
 
 	if err := fwriter.Flush(); err != nil {
-		return fmt.Errorf("Failed to write to file %s: %w", opts.Output, err)
+		return kerrors.WithMsg(err, fmt.Sprintf("Failed to write to file %s", opts.Output))
 	}
 
-	fmt.Printf("Generated file: %s\n", opts.Output)
+	log.Printf("Generated file: %s\n", opts.Output)
 	return nil
+}
+
+func (m *modelDef) genModelSQL() modelSQLStrings {
+	colNum := len(m.Fields)
+	sqlDefs := make([]string, 0, colNum)
+	sqlDBNames := make([]string, 0, colNum)
+	sqlPlaceholders := make([]string, 0, colNum)
+	sqlPlaceholderTpl := make([]string, 0, colNum)
+	sqlPlaceholderCount := make([]string, 0, colNum)
+	sqlIdents := make([]string, 0, colNum)
+
+	placeholderStart := 1
+	for n, i := range m.Fields {
+		sqlDefs = append(sqlDefs, fmt.Sprintf("%s %s", i.DBName, i.DBType))
+		sqlDBNames = append(sqlDBNames, i.DBName)
+		sqlPlaceholders = append(sqlPlaceholders, fmt.Sprintf("$%d", placeholderStart+n))
+		sqlPlaceholderTpl = append(sqlPlaceholderTpl, "$%d")
+		sqlPlaceholderCount = append(sqlPlaceholderCount, fmt.Sprintf("n+%d", placeholderStart+n))
+		sqlIdents = append(sqlIdents, fmt.Sprintf("m.%s", i.Ident))
+	}
+
+	sqlIndicies := make([]modelIndex, 0, len(m.Indicies))
+	for _, i := range m.Indicies {
+		k := make([]string, 0, len(i))
+		for _, j := range i {
+			k = append(k, j.DBName)
+		}
+		sqlIndicies = append(sqlIndicies, modelIndex{
+			Name:    strings.Join(k, "__"),
+			Columns: strings.Join(k, ", "),
+		})
+	}
+
+	return modelSQLStrings{
+		Setup:            strings.Join(sqlDefs, ", "),
+		DBNames:          strings.Join(sqlDBNames, ", "),
+		Placeholders:     strings.Join(sqlPlaceholders, ", "),
+		PlaceholderTpl:   strings.Join(sqlPlaceholderTpl, ", "),
+		PlaceholderCount: strings.Join(sqlPlaceholderCount, ", "),
+		Idents:           strings.Join(sqlIdents, ", "),
+		Indicies:         sqlIndicies,
+		ColNum:           strconv.Itoa(colNum),
+	}
 }
 
 func parseModelDefinitions(modelObjects []dirObjPair, modelTag string, fset *token.FileSet) ([]modelDef, error) {
@@ -552,14 +617,14 @@ func parseQueryFields(astfields []astField, fieldMap map[string]modelField) ([]q
 							return nil, nil, kerrors.WithKind(err, ErrorInvalidModel{}, fmt.Sprintf("Query field opt must be dbname;flag,fields,... for opt %s on field %s", opt[0], f.Ident))
 						}
 						args := opt[1:]
-						k := make([]CondField, 0, len(args))
+						k := make([]condField, 0, len(args))
 						for _, cond := range args {
 							fieldName, cond, err := parseCondField(cond)
 							if err != nil {
 								return nil, nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse condition field for opt %s on field %s", opt[0], f.Ident))
 							}
 							if field, ok := fieldMap[fieldName]; ok {
-								k = append(k, CondField{
+								k = append(k, condField{
 									Kind:  cond,
 									Field: field,
 								})
@@ -700,53 +765,7 @@ func findFields(tagName string, structType *ast.StructType, fset *token.FileSet)
 	return fields, nil
 }
 
-func (m *modelDef) genModelSQL() ModelSQLStrings {
-	colNum := len(m.Fields)
-	sqlDefs := make([]string, 0, colNum)
-	sqlDBNames := make([]string, 0, colNum)
-	sqlPlaceholders := make([]string, 0, colNum)
-	sqlPlaceholderTpl := make([]string, 0, colNum)
-	sqlPlaceholderCount := make([]string, 0, colNum)
-	sqlIdents := make([]string, 0, colNum)
-	sqlIdentRefs := make([]string, 0, colNum)
-
-	placeholderStart := 1
-	for n, i := range m.Fields {
-		sqlDefs = append(sqlDefs, fmt.Sprintf("%s %s", i.DBName, i.DBType))
-		sqlDBNames = append(sqlDBNames, i.DBName)
-		sqlPlaceholders = append(sqlPlaceholders, fmt.Sprintf("$%d", n+placeholderStart))
-		sqlPlaceholderTpl = append(sqlPlaceholderTpl, "$%d")
-		sqlPlaceholderCount = append(sqlPlaceholderCount, fmt.Sprintf("n+%d", n+placeholderStart))
-		sqlIdents = append(sqlIdents, fmt.Sprintf("m.%s", i.Ident))
-		sqlIdentRefs = append(sqlIdentRefs, fmt.Sprintf("&m.%s", i.Ident))
-	}
-
-	sqlIndicies := make([]ModelIndex, 0, len(m.Indicies))
-	for _, i := range m.Indicies {
-		k := make([]string, 0, len(i))
-		for _, j := range i {
-			k = append(k, j.DBName)
-		}
-		sqlIndicies = append(sqlIndicies, ModelIndex{
-			Name:    strings.Join(k, "__"),
-			Columns: strings.Join(k, ", "),
-		})
-	}
-
-	return ModelSQLStrings{
-		Setup:            strings.Join(sqlDefs, ", "),
-		DBNames:          strings.Join(sqlDBNames, ", "),
-		Placeholders:     strings.Join(sqlPlaceholders, ", "),
-		PlaceholderTpl:   strings.Join(sqlPlaceholderTpl, ", "),
-		PlaceholderCount: strings.Join(sqlPlaceholderCount, ", "),
-		Idents:           strings.Join(sqlIdents, ", "),
-		IdentRefs:        strings.Join(sqlIdentRefs, ", "),
-		Indicies:         sqlIndicies,
-		ColNum:           fmt.Sprintf("%d", colNum),
-	}
-}
-
-func (q *QueryDef) genQuerySQL() QuerySQLStrings {
+func (q *queryDef) genQuerySQL() QuerySQLStrings {
 	colNum := len(q.Fields)
 	sqlDBNames := make([]string, 0, colNum)
 	sqlPlaceholders := make([]string, 0, colNum)
@@ -757,13 +776,8 @@ func (q *QueryDef) genQuerySQL() QuerySQLStrings {
 	for n, i := range q.Fields {
 		sqlDBNames = append(sqlDBNames, i.DBName)
 		sqlPlaceholders = append(sqlPlaceholders, fmt.Sprintf("$%d", n+placeholderStart))
-		if dbTypeIsArray(i.DBType) {
-			sqlIdents = append(sqlIdents, fmt.Sprintf("pq.Array(m.%s)", i.Ident))
-			sqlIdentRefs = append(sqlIdentRefs, fmt.Sprintf("pq.Array(&m.%s)", i.Ident))
-		} else {
-			sqlIdents = append(sqlIdents, fmt.Sprintf("m.%s", i.Ident))
-			sqlIdentRefs = append(sqlIdentRefs, fmt.Sprintf("&m.%s", i.Ident))
-		}
+		sqlIdents = append(sqlIdents, fmt.Sprintf("m.%s", i.Ident))
+		sqlIdentRefs = append(sqlIdentRefs, fmt.Sprintf("&m.%s", i.Ident))
 	}
 
 	return QuerySQLStrings{
@@ -775,7 +789,7 @@ func (q *QueryDef) genQuerySQL() QuerySQLStrings {
 	}
 }
 
-func (q *QueryField) genQueryCondSQL(offset int) QueryCondSQLStrings {
+func (q *queryField) genQueryCondSQL(offset int) QueryCondSQLStrings {
 	sqlDBCond := make([]string, 0, len(q.Cond))
 	sqlIdentParams := make([]string, 0, len(q.Cond))
 	sqlIdentArgs := make([]string, 0, len(q.Cond))
@@ -805,7 +819,7 @@ func (q *QueryField) genQueryCondSQL(offset int) QueryCondSQLStrings {
 		case condGeq:
 			identName = "Geq" + identName
 			condText = ">="
-		case condArr:
+		case condIn:
 			paramType = "[]" + paramType
 			identName = "Has" + identName
 		case condLike:
@@ -815,7 +829,7 @@ func (q *QueryField) genQueryCondSQL(offset int) QueryCondSQLStrings {
 			identName = "Eq" + identName
 		}
 
-		if i.Kind == condArr {
+		if i.Kind == condIn {
 			sqlDBCond = append(sqlDBCond, fmt.Sprintf(`%s IN (VALUES "+placeholders%s+")`, dbName, paramName))
 			sqlArrIdentArgs = append(sqlArrIdentArgs, paramName)
 			sqlArrIdentArgsLen = append(sqlArrIdentArgsLen, fmt.Sprintf("len(%s)", paramName))
