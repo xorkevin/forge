@@ -57,9 +57,11 @@ type (
 	}
 
 	modelDef struct {
+		Prefix   string
 		Ident    string
 		Fields   []modelField
 		Indicies [][]modelField
+		fieldMap map[string]modelField
 	}
 
 	modelField struct {
@@ -70,19 +72,19 @@ type (
 		Num    int
 	}
 
-	QueryDef struct {
+	queryDef struct {
 		Ident       string
-		Fields      []QueryField
-		QueryFields []QueryField
+		Fields      []queryField
+		QueryFields []queryField
 	}
 
-	QueryField struct {
+	queryField struct {
 		Ident  string
 		GoType string
 		DBName string
 		DBType string
 		Num    int
-		Mode   QueryFlag
+		Mode   queryFlag
 		Cond   []CondField
 	}
 
@@ -348,6 +350,11 @@ func parseModelDefinitions(modelObjects []dirObjPair, modelTag string, fset *tok
 	modelDefs := make([]modelDef, 0, len(modelObjects))
 
 	for _, i := range modelObjects {
+		dirargs := strings.Fields(i.Dir.Directive)
+		if len(dirargs) != 2 || dirargs[1] == "" {
+			return nil, kerrors.WithKind(nil, ErrorInvalidFile{}, "Model directive without prefix")
+		}
+		prefix := dirargs[1]
 		if i.Obj.Kind != gopackages.ObjKindDeclType {
 			return nil, kerrors.WithKind(nil, ErrorInvalidFile{}, "Model directive used on non-type declaration")
 		}
@@ -370,75 +377,23 @@ func parseModelDefinitions(modelObjects []dirObjPair, modelTag string, fset *tok
 		if len(astFields) == 0 {
 			return nil, kerrors.WithKind(nil, ErrorInvalidFile{}, "No model fields found on struct")
 		}
-		modelFields, indicies, err := parseModelFields(astFields)
+		modelFields, fieldMap, indicies, err := parseModelFields(astFields)
 		if err != nil {
 			return nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse model fields for struct %s", structName))
 		}
 		modelDefs = append(modelDefs, modelDef{
+			Prefix:   prefix,
 			Ident:    structName,
 			Fields:   modelFields,
 			Indicies: indicies,
+			fieldMap: fieldMap,
 		})
 	}
 
 	return modelDefs, nil
-
-	//queryDefs := []QueryDef{}
-	//for _, ident := range queryIdents {
-	//	queryStruct := findStruct(ident, root.Decls)
-	//	if queryStruct == nil {
-	//		return nil, nil, fmt.Errorf("%w: Struct %s not found in %s", ErrInvalidFile, ident, gofile)
-	//	}
-	//	queryASTFields, err := findFields(queryTag, queryStruct, fset)
-	//	if err != nil {
-	//		return nil, nil, fmt.Errorf("Failed to parse query struct %s: %w", ident, err)
-	//	}
-	//	fields, queries, err := parseQueryFields(queryASTFields, seenFields)
-	//	if err != nil {
-	//		return nil, nil, fmt.Errorf("Failed to parse query fields for struct %s: %w", ident, err)
-	//	}
-	//	queryDefs = append(queryDefs, QueryDef{
-	//		Ident:       ident,
-	//		Fields:      fields,
-	//		QueryFields: queries,
-	//	})
-	//}
 }
 
-func findFields(tagName string, structType *ast.StructType, fset *token.FileSet) ([]astField, error) {
-	var fields []astField
-	for _, field := range structType.Fields.List {
-		if field.Tag == nil {
-			continue
-		}
-		structTag := reflect.StructTag(strings.Trim(field.Tag.Value, "`"))
-		tagVal, ok := structTag.Lookup(tagName)
-		if !ok {
-			continue
-		}
-
-		if len(field.Names) != 1 {
-			return nil, kerrors.WithKind(nil, ErrorInvalidModel{}, "Only one field allowed per tag")
-		}
-
-		ident := field.Names[0].Name
-
-		goType := bytes.Buffer{}
-		if err := printer.Fprint(&goType, fset, field.Type); err != nil {
-			return nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to print go struct field type for field %s", ident))
-		}
-
-		m := astField{
-			Ident:  ident,
-			GoType: goType.String(),
-			Tags:   tagVal,
-		}
-		fields = append(fields, m)
-	}
-	return fields, nil
-}
-
-func parseModelFields(astfields []astField) ([]modelField, [][]modelField, error) {
+func parseModelFields(astfields []astField) ([]modelField, map[string]modelField, [][]modelField, error) {
 	fields := make([]modelField, 0, len(astfields))
 	seenFields := map[string]modelField{}
 	var tagIndicies [][]string
@@ -447,10 +402,10 @@ func parseModelFields(astfields []astField) ([]modelField, [][]modelField, error
 		dbstr, rest, _ := strings.Cut(i.Tags, ";")
 		dbName, dbType, ok := strings.Cut(dbstr, ",")
 		if !ok || dbName == "" || dbType == "" {
-			return nil, nil, kerrors.WithKind(nil, ErrorInvalidModel{}, fmt.Sprintf("Model field tag must be dbname,dbtype[;opt[,fields ...][; ...]] on field %s", i.Ident))
+			return nil, nil, nil, kerrors.WithKind(nil, ErrorInvalidModel{}, fmt.Sprintf("Model field tag must be dbname,dbtype[;opt[,fields ...][; ...]] on field %s", i.Ident))
 		}
 		if dup, ok := seenFields[dbName]; ok {
-			return nil, nil, kerrors.WithKind(nil, ErrorInvalidModel{}, fmt.Sprintf("Duplicate field %s on %s and %s", dbName, i.Ident, dup.Ident))
+			return nil, nil, nil, kerrors.WithKind(nil, ErrorInvalidModel{}, fmt.Sprintf("Duplicate field %s on %s and %s", dbName, i.Ident, dup.Ident))
 		}
 		f := modelField{
 			Ident:  i.Ident,
@@ -469,7 +424,7 @@ func parseModelFields(astfields []astField) ([]modelField, [][]modelField, error
 			opt := strings.Split(i, ",")
 			optflag, err := parseModelOpt(opt[0])
 			if err != nil {
-				return nil, nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse model opt for field %s", f.Ident))
+				return nil, nil, nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse model opt for field %s", f.Ident))
 			}
 			switch optflag {
 			case modelOptIndex:
@@ -487,14 +442,14 @@ func parseModelFields(astfields []astField) ([]modelField, [][]modelField, error
 		for _, j := range i {
 			f, ok := seenFields[j]
 			if !ok {
-				return nil, nil, kerrors.WithKind(nil, ErrorInvalidModel{}, fmt.Sprintf("No field %s for index", j))
+				return nil, nil, nil, kerrors.WithKind(nil, ErrorInvalidModel{}, fmt.Sprintf("No field %s for index", j))
 			}
 			k = append(k, f)
 		}
 		indicies = append(indicies, k)
 	}
 
-	return fields, indicies, nil
+	return fields, seenFields, indicies, nil
 }
 
 type (
@@ -515,11 +470,60 @@ func parseModelOpt(opt string) (modelOpt, error) {
 	}
 }
 
-func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([]QueryField, []QueryField, error) {
-	hasQF := false
-	queryFields := []QueryField{}
+func parseQueryDefinitions(queryObjects []dirObjPair, queryTag string, modelDefs map[string]modelDef, fset *token.FileSet) (map[string][]queryDef, error) {
+	queryDefs := map[string][]queryDef{}
 
-	fields := []QueryField{}
+	for _, i := range queryObjects {
+		dirargs := strings.Fields(i.Dir.Directive)
+		if len(dirargs) != 2 || dirargs[1] == "" {
+			return nil, kerrors.WithKind(nil, ErrorInvalidFile{}, "Query directive without prefix")
+		}
+		prefix := dirargs[1]
+		mdef, ok := modelDefs[prefix]
+		if !ok {
+			return nil, kerrors.WithKind(nil, ErrorInvalidFile{}, fmt.Sprintf("Query directive prefix %s without model definition", prefix))
+		}
+		if i.Obj.Kind != gopackages.ObjKindDeclType {
+			return nil, kerrors.WithKind(nil, ErrorInvalidFile{}, "Query directive used on non-type declaration")
+		}
+		typeSpec, ok := i.Obj.Obj.(*ast.TypeSpec)
+		if !ok {
+			return nil, kerrors.WithMsg(nil, "Unexpected directive object type")
+		}
+		structName := typeSpec.Name.Name
+		structType, ok := typeSpec.Type.(*ast.StructType)
+		if !ok {
+			return nil, kerrors.WithKind(nil, ErrorInvalidFile{}, "Query directive used on non-struct type declaration")
+		}
+		if structType.Incomplete {
+			return nil, kerrors.WithMsg(nil, "Unexpected incomplete struct definition")
+		}
+		astFields, err := findFields(queryTag, structType, fset)
+		if err != nil {
+			return nil, err
+		}
+		if len(astFields) == 0 {
+			return nil, kerrors.WithKind(nil, ErrorInvalidFile{}, "No query fields found on struct")
+		}
+		fields, queries, err := parseQueryFields(astFields, mdef.fieldMap)
+		if err != nil {
+			return nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse query fields for struct %s", structName))
+		}
+		queryDefs[prefix] = append(queryDefs[prefix], queryDef{
+			Ident:       structName,
+			Fields:      fields,
+			QueryFields: queries,
+		})
+	}
+
+	return queryDefs, nil
+}
+
+func parseQueryFields(astfields []astField, fieldMap map[string]modelField) ([]queryField, []queryField, error) {
+	hasQF := false
+	var fields []queryField
+	var queryFields []queryField
+
 	for n, i := range astfields {
 		props := strings.SplitN(i.Tags, ";", 2)
 		if len(props) < 1 {
@@ -585,12 +589,46 @@ func parseQueryFields(astfields []ASTField, seenFields map[string]ModelField) ([
 	return fields, queryFields, nil
 }
 
+func findFields(tagName string, structType *ast.StructType, fset *token.FileSet) ([]astField, error) {
+	var fields []astField
+	for _, field := range structType.Fields.List {
+		if field.Tag == nil {
+			continue
+		}
+		structTag := reflect.StructTag(strings.Trim(field.Tag.Value, "`"))
+		tagVal, ok := structTag.Lookup(tagName)
+		if !ok {
+			continue
+		}
+
+		if len(field.Names) != 1 {
+			return nil, kerrors.WithKind(nil, ErrorInvalidModel{}, "Only one field allowed per tag")
+		}
+
+		ident := field.Names[0].Name
+
+		goType := bytes.Buffer{}
+		if err := printer.Fprint(&goType, fset, field.Type); err != nil {
+			return nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to print go struct field type for field %s", ident))
+		}
+
+		m := astField{
+			Ident:  ident,
+			GoType: goType.String(),
+			Tags:   tagVal,
+		}
+		fields = append(fields, m)
+	}
+	return fields, nil
+}
+
 type (
-	QueryFlag int
+	queryFlag int
 )
 
 const (
-	flagGetOneEq QueryFlag = iota
+	queryFlagUnknown queryFlag = iota
+	flagGetOneEq
 	flagGetGroup
 	flagGetGroupEq
 	flagGetGroupSet
@@ -600,7 +638,7 @@ const (
 	flagDelSet
 )
 
-func parseFlag(flag string) (QueryFlag, error) {
+func parseFlag(flag string) (queryFlag, error) {
 	switch flag {
 	case "getoneeq":
 		return flagGetOneEq, nil
