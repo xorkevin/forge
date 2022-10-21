@@ -121,30 +121,30 @@ type (
 		Columns string
 	}
 
-	QuerySQLStrings struct {
-		DBNames      string
-		Placeholders string
-		Idents       string
-		IdentRefs    string
-		ColNum       string
-	}
-
-	QueryCondSQLStrings struct {
-		DBCond          string
-		IdentParams     string
-		IdentArgs       string
-		ArrIdentArgs    []string
-		ArrIdentArgsLen string
-		IdentNames      string
-		ParamCount      int
-	}
-
-	QueryTemplateData struct {
+	queryTemplateData struct {
 		Prefix       string
 		ModelIdent   string
 		PrimaryField queryField
-		SQL          QuerySQLStrings
-		SQLCond      QueryCondSQLStrings
+		SQL          querySQLStrings
+		SQLCond      queryCondSQLStrings
+	}
+
+	querySQLStrings struct {
+		DBNames      string
+		Idents       string
+		IdentRefs    string
+		Placeholders string
+		ColNum       string
+	}
+
+	queryCondSQLStrings struct {
+		IdentNames      string
+		IdentParams     string
+		DBCond          string
+		IdentArgs       string
+		ArrIdentArgs    []string
+		ArrIdentArgsLen string
+		ParamCount      int
 	}
 )
 
@@ -313,47 +313,34 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) error 
 		if err := tplmodel.Execute(fwriter, tplData); err != nil {
 			return kerrors.WithMsg(err, fmt.Sprintf("Failed to execute model template for struct %s", i.Ident))
 		}
-	}
-
-	for _, queryDef := range queryDefs {
-		if opts.Verbose {
-			log.Println("Detected query " + queryDef.Ident + " fields:")
-			for _, i := range queryDef.Fields {
-				log.Printf("* %s %s\n", i.Ident, i.GoType)
+		for _, j := range queryDefs[i.Prefix] {
+			if opts.Verbose {
+				log.Printf("Detected model %s query %s with fields:", i.Ident, j.Ident)
+				for _, i := range j.Fields {
+					log.Printf("* %s %s\n", i.Ident, i.GoType)
+				}
 			}
-		}
-		querySQLStrings := queryDef.genQuerySQL()
-		for _, i := range queryDef.QueryFields {
-			tplData := QueryTemplateData{
-				Prefix:       opts.Prefix,
-				ModelIdent:   queryDef.Ident,
-				PrimaryField: i,
-				SQL:          querySQLStrings,
-			}
-			switch i.Mode {
-			case flagGetOneEq:
-				tplData.SQLCond = i.genQueryCondSQL(0)
-				if err := tplgetoneeq.Execute(fwriter, tplData); err != nil {
-					return kerrors.WithMsg(err, "Failed to execute getoneeq template for field %s on struct %s: %w", tplData.PrimaryField.Ident, tplData.ModelIdent, err)
+			querySQLStrings := j.genQuerySQL()
+			numFields := len(j.Fields)
+			for _, k := range j.QueryFields {
+				tplData := queryTemplateData{
+					Prefix:       i.Prefix,
+					ModelIdent:   j.Ident,
+					PrimaryField: k,
+					SQL:          querySQLStrings,
 				}
-			case flagGetGroup:
-				if err := tplgetgroup.Execute(fwriter, tplData); err != nil {
-					return kerrors.WithMsg(err, "Failed to execute getgroup template for field %s on struct %s: %w", tplData.PrimaryField.Ident, tplData.ModelIdent, err)
+				switch k.Mode {
+				case queryOptGetOneEq:
+					tplData.SQLCond = k.genQueryCondSQL(0)
+				case queryOptGetGroupEq:
+					tplData.SQLCond = k.genQueryCondSQL(2)
+				case queryOptUpdEq:
+					tplData.SQLCond = k.genQueryCondSQL(numFields)
+				case queryOptDelEq:
+					tplData.SQLCond = k.genQueryCondSQL(0)
 				}
-			case flagGetGroupEq:
-				tplData.SQLCond = i.genQueryCondSQL(2)
-				if err := tplgetgroupeq.Execute(fwriter, tplData); err != nil {
-					return kerrors.WithMsg(err, "Failed to execute getgroupeq template for field %s on struct %s: %w", tplData.PrimaryField.Ident, tplData.ModelIdent, err)
-				}
-			case flagUpdEq:
-				tplData.SQLCond = i.genQueryCondSQL(len(queryDef.Fields))
-				if err := tplupdeq.Execute(fwriter, tplData); err != nil {
-					return kerrors.WithMsg(err, "Failed to execute updeq template for field %s on struct %s: %w", tplData.PrimaryField.Ident, tplData.ModelIdent, err)
-				}
-			case flagDelEq:
-				tplData.SQLCond = i.genQueryCondSQL(0)
-				if err := tpldeleq.Execute(fwriter, tplData); err != nil {
-					return kerrors.WithMsg(err, "Failed to execute deleq template for field %s on struct %s: %w", tplData.PrimaryField.Ident, tplData.ModelIdent, err)
+				if err := tplQuery[k.Mode].Execute(fwriter, tplData); err != nil {
+					return kerrors.WithMsg(err, fmt.Sprintf("Failed to execute template for field %s on struct %s", tplData.PrimaryField.Ident, tplData.ModelIdent))
 				}
 			}
 		}
@@ -407,6 +394,93 @@ func (m *modelDef) genModelSQL() modelSQLStrings {
 		Idents:           strings.Join(sqlIdents, ", "),
 		Indicies:         sqlIndicies,
 		ColNum:           strconv.Itoa(colNum),
+	}
+}
+
+func (q *queryDef) genQuerySQL() querySQLStrings {
+	colNum := len(q.Fields)
+	sqlDBNames := make([]string, 0, colNum)
+	sqlIdents := make([]string, 0, colNum)
+	sqlIdentRefs := make([]string, 0, colNum)
+	sqlPlaceholders := make([]string, 0, colNum)
+
+	placeholderStart := 1
+	for n, i := range q.Fields {
+		sqlDBNames = append(sqlDBNames, i.DBName)
+		sqlIdents = append(sqlIdents, fmt.Sprintf("m.%s", i.Ident))
+		sqlIdentRefs = append(sqlIdentRefs, fmt.Sprintf("&m.%s", i.Ident))
+		sqlPlaceholders = append(sqlPlaceholders, fmt.Sprintf("$%d", placeholderStart+n))
+	}
+
+	return querySQLStrings{
+		DBNames:      strings.Join(sqlDBNames, ", "),
+		Idents:       strings.Join(sqlIdents, ", "),
+		IdentRefs:    strings.Join(sqlIdentRefs, ", "),
+		Placeholders: strings.Join(sqlPlaceholders, ", "),
+		ColNum:       fmt.Sprintf("%d", colNum),
+	}
+}
+
+func (q *queryField) genQueryCondSQL(offset int) queryCondSQLStrings {
+	sqlIdentNames := make([]string, 0, len(q.Cond))
+	sqlIdentParams := make([]string, 0, len(q.Cond))
+	sqlDBCond := make([]string, 0, len(q.Cond))
+	sqlIdentArgs := make([]string, 0, len(q.Cond))
+	sqlArrIdentArgs := make([]string, 0, len(q.Cond))
+	sqlArrIdentArgsLen := make([]string, 0, len(q.Cond))
+	paramCount := offset
+	for _, i := range q.Cond {
+		paramName := strings.ToLower(i.Field.Ident)
+		dbName := i.Field.DBName
+		paramType := i.Field.GoType
+		identName := i.Field.Ident
+		condText := "="
+		switch i.Kind {
+		case condNeq:
+			identName = "Neq" + identName
+			condText = "<>"
+		case condLt:
+			identName = "Lt" + identName
+			condText = "<"
+		case condLeq:
+			identName = "Leq" + identName
+			condText = "<="
+		case condGt:
+			identName = "Gt" + identName
+			condText = ">"
+		case condGeq:
+			identName = "Geq" + identName
+			condText = ">="
+		case condIn:
+			paramType = "[]" + paramType
+			identName = "Has" + identName
+		case condLike:
+			identName = "Like" + identName
+			condText = "LIKE"
+		default:
+			identName = "Eq" + identName
+		}
+
+		sqlIdentNames = append(sqlIdentNames, identName)
+		sqlIdentParams = append(sqlIdentParams, fmt.Sprintf("%s %s", paramName, paramType))
+		if i.Kind == condIn {
+			sqlDBCond = append(sqlDBCond, fmt.Sprintf(`%s IN (VALUES "+placeholders%s+")`, dbName, paramName))
+			sqlArrIdentArgs = append(sqlArrIdentArgs, paramName)
+			sqlArrIdentArgsLen = append(sqlArrIdentArgsLen, fmt.Sprintf("len(%s)", paramName))
+		} else {
+			paramCount++
+			sqlDBCond = append(sqlDBCond, fmt.Sprintf("%s %s $%d", dbName, condText, paramCount))
+			sqlIdentArgs = append(sqlIdentArgs, paramName)
+		}
+	}
+	return queryCondSQLStrings{
+		IdentNames:      strings.Join(sqlIdentNames, ""),
+		IdentParams:     strings.Join(sqlIdentParams, ", "),
+		DBCond:          strings.Join(sqlDBCond, " AND "),
+		IdentArgs:       strings.Join(sqlIdentArgs, ", "),
+		ArrIdentArgs:    sqlArrIdentArgs,
+		ArrIdentArgsLen: strings.Join(sqlArrIdentArgsLen, "+"),
+		ParamCount:      paramCount,
 	}
 }
 
@@ -763,91 +837,4 @@ func findFields(tagName string, structType *ast.StructType, fset *token.FileSet)
 		fields = append(fields, m)
 	}
 	return fields, nil
-}
-
-func (q *queryDef) genQuerySQL() QuerySQLStrings {
-	colNum := len(q.Fields)
-	sqlDBNames := make([]string, 0, colNum)
-	sqlPlaceholders := make([]string, 0, colNum)
-	sqlIdents := make([]string, 0, colNum)
-	sqlIdentRefs := make([]string, 0, colNum)
-
-	placeholderStart := 1
-	for n, i := range q.Fields {
-		sqlDBNames = append(sqlDBNames, i.DBName)
-		sqlPlaceholders = append(sqlPlaceholders, fmt.Sprintf("$%d", n+placeholderStart))
-		sqlIdents = append(sqlIdents, fmt.Sprintf("m.%s", i.Ident))
-		sqlIdentRefs = append(sqlIdentRefs, fmt.Sprintf("&m.%s", i.Ident))
-	}
-
-	return QuerySQLStrings{
-		DBNames:      strings.Join(sqlDBNames, ", "),
-		Placeholders: strings.Join(sqlPlaceholders, ", "),
-		Idents:       strings.Join(sqlIdents, ", "),
-		IdentRefs:    strings.Join(sqlIdentRefs, ", "),
-		ColNum:       fmt.Sprintf("%d", colNum),
-	}
-}
-
-func (q *queryField) genQueryCondSQL(offset int) QueryCondSQLStrings {
-	sqlDBCond := make([]string, 0, len(q.Cond))
-	sqlIdentParams := make([]string, 0, len(q.Cond))
-	sqlIdentArgs := make([]string, 0, len(q.Cond))
-	sqlArrIdentArgs := make([]string, 0, len(q.Cond))
-	sqlArrIdentArgsLen := make([]string, 0, len(q.Cond))
-	sqlIdentNames := make([]string, 0, len(q.Cond))
-	paramCount := offset
-	for _, i := range q.Cond {
-		paramName := strings.ToLower(i.Field.Ident)
-		dbName := i.Field.DBName
-		paramType := i.Field.GoType
-		identName := i.Field.Ident
-		condText := "="
-		switch i.Kind {
-		case condNeq:
-			identName = "Neq" + identName
-			condText = "<>"
-		case condLt:
-			identName = "Lt" + identName
-			condText = "<"
-		case condLeq:
-			identName = "Leq" + identName
-			condText = "<="
-		case condGt:
-			identName = "Gt" + identName
-			condText = ">"
-		case condGeq:
-			identName = "Geq" + identName
-			condText = ">="
-		case condIn:
-			paramType = "[]" + paramType
-			identName = "Has" + identName
-		case condLike:
-			identName = "Like" + identName
-			condText = "LIKE"
-		default:
-			identName = "Eq" + identName
-		}
-
-		if i.Kind == condIn {
-			sqlDBCond = append(sqlDBCond, fmt.Sprintf(`%s IN (VALUES "+placeholders%s+")`, dbName, paramName))
-			sqlArrIdentArgs = append(sqlArrIdentArgs, paramName)
-			sqlArrIdentArgsLen = append(sqlArrIdentArgsLen, fmt.Sprintf("len(%s)", paramName))
-		} else {
-			paramCount++
-			sqlDBCond = append(sqlDBCond, fmt.Sprintf("%s %s $%d", dbName, condText, paramCount))
-			sqlIdentArgs = append(sqlIdentArgs, paramName)
-		}
-		sqlIdentParams = append(sqlIdentParams, fmt.Sprintf("%s %s", paramName, paramType))
-		sqlIdentNames = append(sqlIdentNames, identName)
-	}
-	return QueryCondSQLStrings{
-		DBCond:          strings.Join(sqlDBCond, " AND "),
-		IdentParams:     strings.Join(sqlIdentParams, ", "),
-		IdentArgs:       strings.Join(sqlIdentArgs, ", "),
-		ArrIdentArgs:    sqlArrIdentArgs,
-		ArrIdentArgsLen: strings.Join(sqlArrIdentArgsLen, "+"),
-		IdentNames:      strings.Join(sqlIdentNames, ""),
-		ParamCount:      paramCount,
-	}
 }
