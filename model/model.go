@@ -82,9 +82,8 @@ type (
 		Ident  string
 		GoType string
 		DBName string
-		DBType string
 		Num    int
-		Mode   queryFlag
+		Mode   queryOpt
 		Cond   []CondField
 	}
 
@@ -520,61 +519,59 @@ func parseQueryDefinitions(queryObjects []dirObjPair, queryTag string, modelDefs
 }
 
 func parseQueryFields(astfields []astField, fieldMap map[string]modelField) ([]queryField, []queryField, error) {
-	hasQF := false
 	var fields []queryField
 	var queryFields []queryField
 
 	for n, i := range astfields {
-		props := strings.SplitN(i.Tags, ";", 2)
-		if len(props) < 1 {
-			return nil, nil, fmt.Errorf("%w: Query field tag must be dbname[;flag[,args ...][; ...]] for field %s", ErrInvalidModel, i.Ident)
+		dbName, rest, _ := strings.Cut(i.Tags, ";")
+		if len(dbName) < 1 {
+			return nil, nil, kerrors.WithKind(nil, ErrorInvalidModel{}, fmt.Sprintf("Query field tag must be dbname[;flag[,args ...][; ...]] for field %s", i.Ident))
 		}
-		dbName := props[0]
-		modelField, ok := seenFields[dbName]
-		if !ok || i.GoType != modelField.GoType {
-			return nil, nil, fmt.Errorf("%w: Field %s with type %s does not exist on model", ErrInvalidModel, dbName, i.GoType)
+		if mfield, ok := fieldMap[dbName]; !ok || i.GoType != mfield.GoType {
+			return nil, nil, kerrors.WithKind(nil, ErrorInvalidModel{}, fmt.Sprintf("Field %s with type %s does not exist on model", dbName, i.GoType))
 		}
-		f := QueryField{
+		f := queryField{
 			Ident:  i.Ident,
 			GoType: i.GoType,
 			DBName: dbName,
-			DBType: modelField.DBType,
 			Num:    n + 1,
 		}
 		fields = append(fields, f)
-		if len(props) > 1 {
-			hasQF = true
-			for _, t := range strings.Split(props[1], ";") {
-				tags := strings.Split(t, ",")
-				tagflag, err := parseFlag(tags[0])
+		if rest != "" {
+			for _, t := range strings.Split(rest, ";") {
+				opt := strings.Split(t, ",")
+				optflag, err := parseQueryOpt(opt[0])
 				if err != nil {
-					return nil, nil, fmt.Errorf("Failed to parse flags for field %s: %w", f.Ident, err)
+					return nil, nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse query opt for field %s", f.Ident))
 				}
-				f.Mode = tagflag
-				switch tagflag {
-				case flagGetOneEq, flagGetGroupEq, flagUpdEq, flagDelEq:
-					if len(tags) < 2 {
-						return nil, nil, fmt.Errorf("%w: Query field tag must be dbname;flag,fields,... for tag %s on field %s", ErrInvalidModel, tags[0], f.Ident)
-					}
-					k := make([]CondField, 0, len(tags[1:]))
-					for _, cond := range tags[1:] {
-						condName, kind, err := parseCondField(cond)
-						if err != nil {
-							return nil, nil, fmt.Errorf("Failed to parse condition field for tag %s on field %s: %w", tags[0], f.Ident, err)
+				f.Mode = optflag
+				switch optflag {
+				case queryOptGetOneEq, queryOptGetGroupEq, queryOptUpdEq, queryOptDelEq:
+					{
+						if len(opt) < 2 {
+							return nil, nil, kerrors.WithKind(err, ErrorInvalidModel{}, fmt.Sprintf("Query field opt must be dbname;flag,fields,... for opt %s on field %s", opt[0], f.Ident))
 						}
-						if field, ok := seenFields[condName]; ok {
-							k = append(k, CondField{
-								Kind:  kind,
-								Field: field,
-							})
-						} else {
-							return nil, nil, fmt.Errorf("%w: Invalid condition field %s for field %s", ErrInvalidModel, condName, i.Ident)
+						args := opt[1:]
+						k := make([]CondField, 0, len(args))
+						for _, cond := range args {
+							fieldName, cond, err := parseCondField(cond)
+							if err != nil {
+								return nil, nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse condition field for opt %s on field %s", opt[0], f.Ident))
+							}
+							if field, ok := fieldMap[fieldName]; ok {
+								k = append(k, CondField{
+									Kind:  cond,
+									Field: field,
+								})
+							} else {
+								return nil, nil, kerrors.WithKind(nil, ErrorInvalidModel{}, fmt.Sprintf("Invalid condition field %s for field %s", fieldName, i.Ident))
+							}
 						}
+						f.Cond = k
 					}
-					f.Cond = k
 				default:
-					if len(tags) != 1 {
-						return nil, nil, fmt.Errorf("%w: Field tag must be dbname,flag for tag %s on field %s", ErrInvalidModel, tags[0], i.Ident)
+					if len(opt) != 1 {
+						return nil, nil, kerrors.WithKind(nil, ErrorInvalidModel{}, fmt.Sprintf("Field tag must be dbname;flag for opt %s on field %s", opt[0], i.Ident))
 					}
 				}
 				queryFields = append(queryFields, f)
@@ -582,11 +579,92 @@ func parseQueryFields(astfields []astField, fieldMap map[string]modelField) ([]q
 		}
 	}
 
-	if !hasQF {
-		return nil, nil, fmt.Errorf("%w: Query does not contain a query field", ErrInvalidModel)
+	if len(queryFields) == 0 {
+		return nil, nil, kerrors.WithKind(nil, ErrorInvalidModel{}, "Query does not contain a query field")
 	}
 
 	return fields, queryFields, nil
+}
+
+type (
+	queryOpt int
+)
+
+const (
+	queryOptUnknown queryOpt = iota
+	queryOptGetOneEq
+	queryOptGetGroup
+	queryOptGetGroupEq
+	queryOptUpdEq
+	queryOptDelEq
+)
+
+func parseQueryOpt(opt string) (queryOpt, error) {
+	switch opt {
+	case "getoneeq":
+		return queryOptGetOneEq, nil
+	case "getgroup":
+		return queryOptGetGroup, nil
+	case "getgroupeq":
+		return queryOptGetGroupEq, nil
+	case "updeq":
+		return queryOptUpdEq, nil
+	case "deleq":
+		return queryOptDelEq, nil
+	default:
+		return queryOptUnknown, kerrors.WithKind(nil, ErrorInvalidModel{}, fmt.Sprintf("Illegal opt %s", opt))
+	}
+}
+
+type (
+	condType int
+)
+
+const (
+	condUnknown condType = iota
+	condEq
+	condNeq
+	condLt
+	condLeq
+	condGt
+	condGeq
+	condIn
+	condLike
+)
+
+func parseCondField(field string) (string, condType, error) {
+	fieldName, condName, _ := strings.Cut(field, "|")
+	if condName != "" {
+		cond, err := parseCond(condName)
+		if err != nil {
+			return "", condUnknown, err
+		}
+		return fieldName, cond, nil
+	}
+	return fieldName, condEq, nil
+}
+
+func parseCond(cond string) (condType, error) {
+	switch cond {
+	case "eq":
+		return condEq, nil
+	case "neq":
+		return condNeq, nil
+	case "lt":
+		return condLt, nil
+	case "leq":
+		return condLeq, nil
+	case "gt":
+		return condGt, nil
+	case "geq":
+		return condGeq, nil
+	case "in":
+		return condIn, nil
+	case "like":
+		return condLike, nil
+	default:
+		return condUnknown, kerrors.WithKind(nil, ErrorInvalidModel{}, fmt.Sprintf("Illegal cond type %s", cond))
+	}
 }
 
 func findFields(tagName string, structType *ast.StructType, fset *token.FileSet) ([]astField, error) {
@@ -622,93 +700,6 @@ func findFields(tagName string, structType *ast.StructType, fset *token.FileSet)
 	return fields, nil
 }
 
-type (
-	queryFlag int
-)
-
-const (
-	queryFlagUnknown queryFlag = iota
-	flagGetOneEq
-	flagGetGroup
-	flagGetGroupEq
-	flagGetGroupSet
-	flagUpdEq
-	flagUpdSet
-	flagDelEq
-	flagDelSet
-)
-
-func parseFlag(flag string) (queryFlag, error) {
-	switch flag {
-	case "getoneeq":
-		return flagGetOneEq, nil
-	case "getgroup":
-		return flagGetGroup, nil
-	case "getgroupeq":
-		return flagGetGroupEq, nil
-	case "updeq":
-		return flagUpdEq, nil
-	case "deleq":
-		return flagDelEq, nil
-	default:
-		return 0, fmt.Errorf("%w: Illegal flag %s", ErrInvalidModel, flag)
-	}
-}
-
-type (
-	CondType int
-)
-
-const (
-	condEq CondType = iota
-	condNeq
-	condLt
-	condLeq
-	condGt
-	condGeq
-	condArr
-	condLike
-)
-
-func parseCondField(field string) (string, CondType, error) {
-	k := strings.SplitN(field, "|", 2)
-	if len(k) == 2 {
-		cond, err := parseCond(k[1])
-		if err != nil {
-			return "", 0, err
-		}
-		return k[0], cond, nil
-	}
-	return field, condEq, nil
-}
-
-func parseCond(cond string) (CondType, error) {
-	switch cond {
-	case "eq":
-		return condEq, nil
-	case "neq":
-		return condNeq, nil
-	case "lt":
-		return condLt, nil
-	case "leq":
-		return condLeq, nil
-	case "gt":
-		return condGt, nil
-	case "geq":
-		return condGeq, nil
-	case "arr":
-		return condArr, nil
-	case "like":
-		return condLike, nil
-	default:
-		return 0, fmt.Errorf("%w: Illegal cond type %s", ErrInvalidModel, cond)
-	}
-}
-
-func dbTypeIsArray(dbType string) bool {
-	return strings.Contains(dbType, "ARRAY")
-}
-
 func (m *modelDef) genModelSQL() ModelSQLStrings {
 	colNum := len(m.Fields)
 	sqlDefs := make([]string, 0, colNum)
@@ -726,13 +717,8 @@ func (m *modelDef) genModelSQL() ModelSQLStrings {
 		sqlPlaceholders = append(sqlPlaceholders, fmt.Sprintf("$%d", n+placeholderStart))
 		sqlPlaceholderTpl = append(sqlPlaceholderTpl, "$%d")
 		sqlPlaceholderCount = append(sqlPlaceholderCount, fmt.Sprintf("n+%d", n+placeholderStart))
-		if dbTypeIsArray(i.DBType) {
-			sqlIdents = append(sqlIdents, fmt.Sprintf("pq.Array(m.%s)", i.Ident))
-			sqlIdentRefs = append(sqlIdentRefs, fmt.Sprintf("pq.Array(&m.%s)", i.Ident))
-		} else {
-			sqlIdents = append(sqlIdents, fmt.Sprintf("m.%s", i.Ident))
-			sqlIdentRefs = append(sqlIdentRefs, fmt.Sprintf("&m.%s", i.Ident))
-		}
+		sqlIdents = append(sqlIdents, fmt.Sprintf("m.%s", i.Ident))
+		sqlIdentRefs = append(sqlIdentRefs, fmt.Sprintf("&m.%s", i.Ident))
 	}
 
 	sqlIndicies := make([]ModelIndex, 0, len(m.Indicies))
