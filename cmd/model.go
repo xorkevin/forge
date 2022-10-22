@@ -103,8 +103,8 @@ func init() {
 
 	modelCmd.PersistentFlags().BoolVarP(&modelVerbose, "verbose", "v", false, "increase the verbosity of output")
 	modelCmd.PersistentFlags().StringVarP(&modelOutputFile, "output", "o", "model_gen.go", "output filename")
-	validationCmd.PersistentFlags().StringVar(&modelInclude, "include", "", "regex for filenames of files that should be included")
-	validationCmd.PersistentFlags().StringVar(&modelIgnore, "ignore", "", "regex for filenames of files that should be ignored")
+	modelCmd.PersistentFlags().StringVar(&modelInclude, "include", "", "regex for filenames of files that should be included")
+	modelCmd.PersistentFlags().StringVar(&modelIgnore, "ignore", "", "regex for filenames of files that should be ignored")
 	modelCmd.PersistentFlags().StringVar(&modelDirective, "model-directive", "forge:model", "comment directive of types that are models")
 	modelCmd.PersistentFlags().StringVar(&modelQueryDirective, "query-directive", "forge:model:query", "comment directive of types that are model queries")
 	modelCmd.PersistentFlags().StringVar(&modelModelTag, "model-tag", "model", "go struct tag for defining model fields")
