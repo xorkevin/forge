@@ -33,13 +33,13 @@ type (
 	//forge:valid
 	reqSearchUsers struct {
 		Prefix string ` + "`" + `valid:"username,opt" json:"-"` + "`" + `
-		Amount int    ` + "`" + `valid:"amount" json:"-"` + "`" + `
+		Amount int ` + "`" + `valid:"amount" json:"-"` + "`" + `
 	}
 
 	//forge:validnope
 	reqOther struct {
 		Prefix string ` + "`" + `valid:"username,opt" json:"-"` + "`" + `
-		Amount int    ` + "`" + `valid:"amount" json:"-"` + "`" + `
+		Amount int ` + "`" + `valid:"amount" json:"-"` + "`" + `
 	}
 
 	//forge:valid
@@ -59,7 +59,7 @@ type (
 	//forge:valid
 	reqAnother struct {
 		Prefix string ` + "`" + `valid:"username,opt" json:"-"` + "`" + `
-		Amount int    ` + "`" + `valid:"amount" json:"-"` + "`" + `
+		Amount int ` + "`" + `valid:"amount" json:"-"` + "`" + `
 	}
 )
 `),
@@ -73,7 +73,7 @@ type (
 	//forge:valid
 	reqAgain struct {
 		Prefix string ` + "`" + `valid:"username,opt" json:"-"` + "`" + `
-		Amount int    ` + "`" + `valid:"amount" json:"-"` + "`" + `
+		Amount int ` + "`" + `valid:"amount" json:"-"` + "`" + `
 	}
 )
 `),
