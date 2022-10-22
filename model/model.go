@@ -42,7 +42,7 @@ func (e ErrorInvalidFile) Error() string {
 	return "Invalid file"
 }
 func (e ErrorInvalidModel) Error() string {
-	return "Invalid validator"
+	return "Invalid model"
 }
 
 type (

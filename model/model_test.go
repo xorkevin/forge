@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"xorkevin.dev/forge/gopackages"
 	"xorkevin.dev/forge/writefs"
 )
 
@@ -59,6 +60,20 @@ type (
 type(
 	//forge:query user
 	Info struct {
+		Userid string ` + "`" + `query:"userid;getgroup;getgroupeq,userid|in"` + "`" + `
+		Username string ` + "`" + `query:"username;getgroupeq,username|like"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+				"stuff_again.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type(
+	//forge:query user
+	InfoAgain struct {
 		Userid string ` + "`" + `query:"userid;getgroup;getgroupeq,userid|in"` + "`" + `
 		Username string ` + "`" + `query:"username;getgroupeq,username|like"` + "`" + `
 	}
@@ -250,6 +265,198 @@ func (t *userModelTable) UpduserPropsEqUserid(ctx context.Context, d db.SQLExecu
 `,
 			},
 		},
+		{
+			Name: "errors on wrong package",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package different
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorEnv{},
+		},
+		{
+			Name: "errors on no models",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidFile{},
+		},
+		{
+			Name: "errors on model directive on non-typedef",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+//forge:model user
+const (
+	foo = "bar"
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidFile{},
+		},
+		{
+			Name: "errors on model directive without prefix arg",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" json:"-"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidFile{},
+		},
+		{
+			Name: "errors on model tag on multiple fields",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	Model struct {
+		Userid, Other string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" json:"-"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidModel{},
+		},
+		{
+			Name: "errors on malformed model tag",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	Model struct {
+		Userid string ` + "`" + `model:"" json:"-"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidModel{},
+		},
+		{
+			Name: "errors on invalid model tag value",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY;bogus" json:"-"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidModel{},
+		},
+		{
+			Name: "errors on no model tags",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	Model struct {
+		Userid string
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidFile{},
+		},
+		{
+			Name: "errors on model directive on non-struct",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	Model []string
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidFile{},
+		},
+		{
+			Name: "errors on duplicate model field",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" json:"-"` + "`" + `
+		Username string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" json:"-"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidModel{},
+		},
+		{
+			Name: "errors on invalid model index opt field",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY;index,bogus" json:"-"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidModel{},
+		},
 	} {
 		tc := tc
 		t.Run(tc.Name, func(t *testing.T) {
@@ -282,4 +489,98 @@ func (t *userModelTable) UpduserPropsEqUserid(ctx context.Context, d db.SQLExecu
 			}
 		})
 	}
+
+	t.Run("errors on invalid regex", func(t *testing.T) {
+		t.Parallel()
+
+		fsys := fstest.MapFS{
+			"stuff.go": &fstest.MapFile{
+				Data: []byte(`package somepackage
+`),
+				Mode:    filemode,
+				ModTime: now,
+			},
+		}
+
+		t.Run("invalid include", func(t *testing.T) {
+			t.Parallel()
+
+			assert := require.New(t)
+
+			outputfs := writefs.NewFSMock()
+			err := Generate(outputfs, fsys, Opts{
+				Verbose:        true,
+				Version:        "dev",
+				Output:         "model_gen.go",
+				Include:        `\y`,
+				Ignore:         `_again\.go$`,
+				ModelDirective: "forge:model",
+				QueryDirective: "forge:query",
+				ModelTag:       "model",
+				QueryTag:       "query",
+			}, ExecEnv{
+				GoPackage: "somepackage",
+			})
+			assert.Error(err)
+		})
+
+		t.Run("invalid ignore", func(t *testing.T) {
+			t.Parallel()
+
+			assert := require.New(t)
+
+			outputfs := writefs.NewFSMock()
+			err := Generate(outputfs, fsys, Opts{
+				Verbose:        true,
+				Version:        "dev",
+				Output:         "model_gen.go",
+				Include:        "stuff",
+				Ignore:         `\y`,
+				ModelDirective: "forge:model",
+				QueryDirective: "forge:query",
+				ModelTag:       "model",
+				QueryTag:       "query",
+			}, ExecEnv{
+				GoPackage: "somepackage",
+			})
+			assert.Error(err)
+		})
+	})
+
+	t.Run("reports ReadDir errors", func(t *testing.T) {
+		t.Parallel()
+
+		assert := require.New(t)
+
+		fsys := fstest.MapFS{
+			"stuff.go": &fstest.MapFile{
+				Data: []byte(`package somepackage
+`),
+				Mode:    filemode,
+				ModTime: now,
+			},
+			"other.go": &fstest.MapFile{
+				Data: []byte(`package different
+`),
+				Mode:    filemode,
+				ModTime: now,
+			},
+		}
+
+		outputfs := writefs.NewFSMock()
+		err := Generate(outputfs, fsys, Opts{
+			Verbose:        true,
+			Version:        "dev",
+			Output:         "model_gen.go",
+			Include:        "",
+			Ignore:         "",
+			ModelDirective: "forge:model",
+			QueryDirective: "forge:query",
+			ModelTag:       "model",
+			QueryTag:       "query",
+		}, ExecEnv{
+			GoPackage: "somepackage",
+		})
+		assert.ErrorIs(err, gopackages.ErrorConflictingPackage{})
+	})
 }
