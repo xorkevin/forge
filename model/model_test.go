@@ -49,6 +49,16 @@ type (
 		Prefix string
 		Amount int
 	}
+
+	//forge:model sm
+	//forge:query sm
+	SM struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"userid;getoneeq,userid|neq,username|lt,first_name|leq,last_name|gt,email|geq"` + "`" + `
+		Username string ` + "`" + `model:"username,VARCHAR(255)" query:"username"` + "`" + `
+		FirstName string ` + "`" + `model:"first_name,VARCHAR(255)" query:"first_name"` + "`" + `
+		LastName string ` + "`" + `model:"last_name,VARCHAR(255)" query:"last_name"` + "`" + `
+		Email string ` + "`" + `model:"email,VARCHAR(255)" query:"email"` + "`" + `
+	}
 )
 `),
 					Mode:    filemode,
@@ -261,6 +271,55 @@ func (t *userModelTable) UpduserPropsEqUserid(ctx context.Context, d db.SQLExecu
 		return err
 	}
 	return nil
+}
+
+type (
+	smModelTable struct {
+		TableName string
+	}
+)
+
+func (t *smModelTable) Setup(ctx context.Context, d db.SQLExecutor) error {
+	_, err := d.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS "+t.TableName+" (userid VARCHAR(31) PRIMARY KEY, username VARCHAR(255), first_name VARCHAR(255), last_name VARCHAR(255), email VARCHAR(255));")
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *smModelTable) Insert(ctx context.Context, d db.SQLExecutor, m *SM) error {
+	_, err := d.ExecContext(ctx, "INSERT INTO "+t.TableName+" (userid, username, first_name, last_name, email) VALUES ($1, $2, $3, $4, $5);", m.Userid, m.Username, m.FirstName, m.LastName, m.Email)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *smModelTable) InsertBulk(ctx context.Context, d db.SQLExecutor, models []*SM, allowConflict bool) error {
+	conflictSQL := ""
+	if allowConflict {
+		conflictSQL = " ON CONFLICT DO NOTHING"
+	}
+	placeholders := make([]string, 0, len(models))
+	args := make([]interface{}, 0, len(models)*5)
+	for c, m := range models {
+		n := c * 5
+		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d)", n+1, n+2, n+3, n+4, n+5))
+		args = append(args, m.Userid, m.Username, m.FirstName, m.LastName, m.Email)
+	}
+	_, err := d.ExecContext(ctx, "INSERT INTO "+t.TableName+" (userid, username, first_name, last_name, email) VALUES "+strings.Join(placeholders, ", ")+conflictSQL+";", args...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *smModelTable) GetSMNeqUseridLtUsernameLeqFirstNameGtLastNameGeqEmail(ctx context.Context, d db.SQLExecutor, userid string, username string, firstname string, lastname string, email string) (*SM, error) {
+	m := &SM{}
+	if err := d.QueryRowContext(ctx, "SELECT userid, username, first_name, last_name, email FROM "+t.TableName+" WHERE userid <> $1 AND username < $2 AND first_name <= $3 AND last_name > $4 AND email >= $5;", userid, username, firstname, lastname, email).Scan(&m.Userid, &m.Username, &m.FirstName, &m.LastName, &m.Email); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 `,
 			},
