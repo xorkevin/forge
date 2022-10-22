@@ -16,7 +16,7 @@ func (t *{{.Prefix}}ModelTable) Get{{.ModelIdent}}Ord{{.PrimaryField.Ident}}(ctx
 		}
 	}()
 	for rows.Next() {
-		m := {{.ModelIdent}}{}
+		var m {{.ModelIdent}}
 		if err := rows.Scan({{.SQL.IdentRefs}}); err != nil {
 			return nil, err
 		}

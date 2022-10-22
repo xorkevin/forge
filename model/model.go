@@ -452,9 +452,11 @@ func (q *queryField) genQueryCondSQL(offset int) queryCondSQLStrings {
 			identName = "Geq" + identName
 			condText = ">="
 		case condIn:
+			paramName = paramName + "s"
 			paramType = "[]" + paramType
 			identName = "Has" + identName
 		case condLike:
+			paramName = paramName + "Prefix"
 			identName = "Like" + identName
 			condText = "LIKE"
 		default:

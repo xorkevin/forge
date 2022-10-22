@@ -33,7 +33,7 @@ func (t *{{.Prefix}}ModelTable) Get{{.ModelIdent}}{{.SQLCond.IdentNames}}Ord{{.P
 		}
 	}()
 	for rows.Next() {
-		m := {{.ModelIdent}}{}
+		var m {{.ModelIdent}}
 		if err := rows.Scan({{.SQL.IdentRefs}}); err != nil {
 			return nil, err
 		}
