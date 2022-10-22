@@ -3,6 +3,7 @@ package cmd
 import (
 	"log"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -72,7 +73,9 @@ func (c *Cmd) initConfig(cmd *cobra.Command, args []string) {
 		}
 	}
 
+	viper.SetEnvPrefix("FORGE")
 	viper.AutomaticEnv() // read in environment variables that match
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "__"))
 
 	// If a config file is found, read it in.
 	configErr := viper.ReadInConfig()
@@ -80,7 +83,7 @@ func (c *Cmd) initConfig(cmd *cobra.Command, args []string) {
 		if configErr == nil {
 			log.Printf("Using config file: %s\n", viper.ConfigFileUsed())
 		} else {
-			log.Printf("Failed reading config file: %s\n", configErr)
+			log.Printf("Failed reading config file: %v\n", configErr)
 		}
 	}
 }
