@@ -315,7 +315,7 @@ const (
 type (
 	//forge:model
 	Model struct {
-		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" json:"-"` + "`" + `
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
 	}
 )
 `),
@@ -334,7 +334,7 @@ type (
 type (
 	//forge:model user
 	Model struct {
-		Userid, Other string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" json:"-"` + "`" + `
+		Userid, Other string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
 	}
 )
 `),
@@ -353,7 +353,7 @@ type (
 type (
 	//forge:model user
 	Model struct {
-		Userid string ` + "`" + `model:"" json:"-"` + "`" + `
+		Userid string ` + "`" + `model:""` + "`" + `
 	}
 )
 `),
@@ -372,7 +372,7 @@ type (
 type (
 	//forge:model user
 	Model struct {
-		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY;bogus" json:"-"` + "`" + `
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY;bogus"` + "`" + `
 	}
 )
 `),
@@ -427,8 +427,8 @@ type (
 type (
 	//forge:model user
 	Model struct {
-		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" json:"-"` + "`" + `
-		Username string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" json:"-"` + "`" + `
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
+		Username string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
 	}
 )
 `),
@@ -447,7 +447,294 @@ type (
 type (
 	//forge:model user
 	Model struct {
-		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY;index,bogus" json:"-"` + "`" + `
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY;index,bogus"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidModel{},
+		},
+		{
+			Name: "errors on query directive without prefix arg",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	//forge:query
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidFile{},
+		},
+		{
+			Name: "errors on query directive without model def",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	//forge:query dne
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidFile{},
+		},
+		{
+			Name: "errors on query directive on non-typedef",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
+	}
+)
+
+//forge:query user
+const (
+	foo = "bar"
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidFile{},
+		},
+		{
+			Name: "errors on query directive on non-struct",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
+	}
+
+	//forge:query user
+	Info []string
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidFile{},
+		},
+		{
+			Name: "errors on query without fields",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	//forge:query user
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidFile{},
+		},
+		{
+			Name: "errors on query tag on multiple fields",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	//forge:query user
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
+		Other, Another string ` + "`" + `query:"userid"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidModel{},
+		},
+		{
+			Name: "errors on malformed query tag",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	//forge:query user
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:""` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidModel{},
+		},
+		{
+			Name: "errors on invalid query tag field",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	//forge:query user
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"bogus,getoneeq,userid"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidModel{},
+		},
+		{
+			Name: "errors on no query fields",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	//forge:query user
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"userid"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidModel{},
+		},
+		{
+			Name: "errors on invalid query tag opt",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	//forge:query user
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"userid;bogus"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidModel{},
+		},
+		{
+			Name: "errors on missing query tag opt args",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	//forge:query user
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"userid;getoneeq"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidModel{},
+		},
+		{
+			Name: "errors on too many query tag opt args",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	//forge:query user
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"userid;getgroup,userid"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidModel{},
+		},
+		{
+			Name: "errors on invalid query tag opt cond",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	//forge:query user
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"userid;getoneeq,userid|bogus"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrorInvalidModel{},
+		},
+		{
+			Name: "errors on invalid query tag opt arg field",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	//forge:query user
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"userid;getoneeq,bogus"` + "`" + `
 	}
 )
 `),
