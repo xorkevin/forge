@@ -1,9 +1,8 @@
 ## forge completion
 
-generate the autocompletion script for the specified shell
+Generate the autocompletion script for the specified shell
 
 ### Synopsis
-
 
 Generate the autocompletion script for forge for the specified shell.
 See each sub-command's help for details on how to use the generated script.
@@ -25,8 +24,8 @@ See each sub-command's help for details on how to use the generated script.
 ### SEE ALSO
 
 * [forge](forge.md)	 - A code generation utility
-* [forge completion bash](forge_completion_bash.md)	 - generate the autocompletion script for bash
-* [forge completion fish](forge_completion_fish.md)	 - generate the autocompletion script for fish
-* [forge completion powershell](forge_completion_powershell.md)	 - generate the autocompletion script for powershell
-* [forge completion zsh](forge_completion_zsh.md)	 - generate the autocompletion script for zsh
+* [forge completion bash](forge_completion_bash.md)	 - Generate the autocompletion script for bash
+* [forge completion fish](forge_completion_fish.md)	 - Generate the autocompletion script for fish
+* [forge completion powershell](forge_completion_powershell.md)	 - Generate the autocompletion script for powershell
+* [forge completion zsh](forge_completion_zsh.md)	 - Generate the autocompletion script for zsh
 

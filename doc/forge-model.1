@@ -1,9 +1,9 @@
 .nh
-.TH "forge" "1" "Oct 2021" "" ""
+.TH "forge" "1" "Oct 2022" "" ""
 
 .SH NAME
 .PP
-forge\-model \- Generates models
+forge-model - Generates models
 
 
 .SH SYNOPSIS
@@ -41,7 +41,7 @@ following syntax:
 .RS
 
 .nf
-column\_name,sql\_type[;opt[,args ...][; ...]]
+column_name,sql_type[;opt[,args ...][; ...]]
 
 .fi
 .RE
@@ -51,7 +51,7 @@ Fields without a "model" tag are ignored.
 
 .PP
 Valid opts are:
-	\- index: args(field,...), creates a index from the provided fields and
+	- index: args(field,...), creates a index from the provided fields and
 	current field
 
 .PP
@@ -63,13 +63,13 @@ result with a value of the syntax:
 .RS
 
 .nf
-column\_name[;flag[,args ...][; ...]]
+column_name[;flag[,args ...][; ...]]
 
 .fi
 .RE
 
 .PP
-column\_name refers to the column name defined in the model. The go field type
+column_name refers to the column name defined in the model. The go field type
 must also be the same between the model and the query.
 
 .PP
@@ -77,70 +77,74 @@ Fields without a "query" tag are ignored.
 
 .PP
 Valid flags are:
-	\- getoneeq: args(equal\_field,...), gets a single row where the equal field(s)
+	- getoneeq: args(equal_field,...), gets a single row where the equal field(s)
 	are equal to the input
-	\- getgroup: (no args), gets all rows ordered by the field value
-	\- getgroupeq: args(equal\_field,...), gets all rows where the equal field(s)
+	- getgroup: (no args), gets all rows ordered by the field value
+	- getgroupeq: args(equal_field,...), gets all rows where the equal field(s)
 	are equal to the input ordered by the field value
-	\- updeq: args(equal\_field,...), updates all rows where the equal fields(s)
+	- updeq: args(equal_field,...), updates all rows where the equal fields(s)
 	are equal to the input
-	\- deleq: args(equal\_field,...), deletes all rows where the equal fields(s)
+	- deleq: args(equal_field,...), deletes all rows where the equal fields(s)
 	are equal to the input
 
 .PP
-equal\_field by default has a condition of eq, but it may be explicitly
-specified by column\_name|cond. cond may be one of:
-	\- eq: column value equals the input
-	\- neq: column value not equal to the input
-	\- lt: column value less than the input
-	\- leq: column value less than or equal to the input
-	\- gt: column value greater than the input
-	\- geq: column value greater than or equal to the input
-	\- arr: column value equals one of the values of the input set
-	\- like: column value like the input
+equal_field by default has a condition of eq, but it may be explicitly
+specified by column_name|cond. cond may be one of:
+	- eq: column value equals the input
+	- neq: column value not equal to the input
+	- lt: column value less than the input
+	- leq: column value less than or equal to the input
+	- gt: column value greater than the input
+	- geq: column value greater than or equal to the input
+	- in: column value equals one of the values of the input set
+	- like: column value like the input
 
 
 .SH OPTIONS
 .PP
-\fB\-h\fP, \fB\-\-help\fP[=false]
+\fB-h\fP, \fB--help\fP[=false]
 	help for model
 
 .PP
-\fB\-m\fP, \fB\-\-model\fP=""
-	name of the model identifier
+\fB--ignore\fP=""
+	regex for filenames of files that should be ignored
 
 .PP
-\fB\-\-model\-tag\fP="model"
+\fB--include\fP=""
+	regex for filenames of files that should be included
+
+.PP
+\fB--model-directive\fP="forge:model"
+	comment directive of types that are models
+
+.PP
+\fB--model-tag\fP="model"
 	go struct tag for defining model fields
 
 .PP
-\fB\-o\fP, \fB\-\-output\fP="model\_gen.go"
+\fB-o\fP, \fB--output\fP="model_gen.go"
 	output filename
 
 .PP
-\fB\-p\fP, \fB\-\-prefix\fP=""
-	prefix of identifiers in generated file
+\fB--query-directive\fP="forge:model:query"
+	comment directive of types that are model queries
 
 .PP
-\fB\-\-query\-tag\fP="query"
+\fB--query-tag\fP="query"
 	go struct tag for defining query fields
 
 .PP
-\fB\-t\fP, \fB\-\-table\fP=""
-	name of the table in the database
-
-.PP
-\fB\-v\fP, \fB\-\-verbose\fP[=false]
+\fB-v\fP, \fB--verbose\fP[=false]
 	increase the verbosity of output
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 .PP
-\fB\-\-config\fP=""
-	config file (default is $XDG\_CONFIG\_HOME/.forge.yaml)
+\fB--config\fP=""
+	config file (default is $XDG_CONFIG_HOME/.forge.yaml)
 
 .PP
-\fB\-\-debug\fP[=false]
+\fB--debug\fP[=false]
 	turn on debug output
 
 

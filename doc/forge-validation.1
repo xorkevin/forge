@@ -1,9 +1,9 @@
 .nh
-.TH "forge" "1" "Oct 2021" "" ""
+.TH "forge" "1" "Oct 2022" "" ""
 
 .SH NAME
 .PP
-forge\-validation \- Generates validations
+forge-validation - Generates validations
 
 
 .SH SYNOPSIS
@@ -14,6 +14,19 @@ forge\-validation \- Generates validations
 .SH DESCRIPTION
 .PP
 Generates common validation on go structs
+
+.PP
+forge validation is called with the following environment variables:
+
+.PP
+.RS
+
+.nf
+GOPACKAGE: name of the go package
+GOFILE: name of the go source file
+
+.fi
+.RE
 
 .PP
 forge validation code generates a validation method for structs, where for
@@ -37,7 +50,7 @@ type test struct {
 
 .PP
 a method will be generated with the name of prefix (default: valid) calling
-functions beginning with valid\-prefix (default: valid) or has\-prefix (default:
+functions beginning with valid-prefix (default: valid) or has-prefix (default:
 validhas) and returning error. The example from above with the default options
 would generate:
 
@@ -130,7 +143,7 @@ func (r test) valid() error {
 
 .PP
 The "has" suffix is a feature designed to allow certain fields to be validated
-by functions that are less restrictive than the non\-has variant. This is to
+by functions that are less restrictive than the non-has variant. This is to
 allow the robustness principle: "Be conservative in what you send, be liberal
 in what you accept." The "has" suffix is also useful in cases where the legal
 values of newly created fields may change over time, such as password length
@@ -143,45 +156,57 @@ The "opt" suffix is a feature designed to allow certain fields to be omitted.
 
 .SH OPTIONS
 .PP
-\fB\-\-has\-prefix\fP="validhas"
+\fB--directive\fP="forge:valid"
+	comment directive of types that should be validated
+
+.PP
+\fB--field-tag\fP="valid"
+	go struct field tag for defining validations
+
+.PP
+\fB--has-prefix\fP="validhas"
 	prefix of has functions
 
 .PP
-\fB\-h\fP, \fB\-\-help\fP[=false]
+\fB-h\fP, \fB--help\fP[=false]
 	help for validation
 
 .PP
-\fB\-\-opt\-prefix\fP="validopt"
+\fB--ignore\fP=""
+	regex for filenames of files that should be ignored
+
+.PP
+\fB--include\fP=""
+	regex for filenames of files that should be included
+
+.PP
+\fB--opt-prefix\fP="validopt"
 	prefix of opt functions
 
 .PP
-\fB\-o\fP, \fB\-\-output\fP="validation\_gen.go"
+\fB-o\fP, \fB--output\fP="validation_gen.go"
 	output filename
 
 .PP
-\fB\-p\fP, \fB\-\-prefix\fP="valid"
+\fB-p\fP, \fB--prefix\fP="valid"
 	prefix of identifiers in generated file
 
 .PP
-\fB\-\-valid\-prefix\fP="valid"
+\fB--valid-prefix\fP="valid"
 	prefix of validation functions
 
 .PP
-\fB\-\-validate\-tag\fP="valid"
-	go struct tag for defining field validations
-
-.PP
-\fB\-v\fP, \fB\-\-verbose\fP[=false]
+\fB-v\fP, \fB--verbose\fP[=false]
 	increase the verbosity of output
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 .PP
-\fB\-\-config\fP=""
-	config file (default is $XDG\_CONFIG\_HOME/.forge.yaml)
+\fB--config\fP=""
+	config file (default is $XDG_CONFIG_HOME/.forge.yaml)
 
 .PP
-\fB\-\-debug\fP[=false]
+\fB--debug\fP[=false]
 	turn on debug output
 
 

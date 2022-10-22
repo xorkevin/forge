@@ -1,29 +1,30 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
+	"log"
 
 	"github.com/spf13/cobra"
 	"xorkevin.dev/forge/model"
 )
 
-var (
-	modelVerbose        bool
-	modelOutputFile     string
-	modelInclude        string
-	modelIgnore         string
-	modelDirective      string
-	modelQueryDirective string
-	modelModelTag       string
-	modelQueryTag       string
+type (
+	modelFlags struct {
+		verbose        bool
+		outputFile     string
+		include        string
+		ignore         string
+		directive      string
+		queryDirective string
+		modelTag       string
+		queryTag       string
+	}
 )
 
-// modelCmd represents the model command
-var modelCmd = &cobra.Command{
-	Use:   "model [query ...]",
-	Short: "Generates models",
-	Long: `Generates common SQL patterns needed for relational models
+func (c *Cmd) getModelCmd() *cobra.Command {
+	modelCmd := &cobra.Command{
+		Use:   "model [query ...]",
+		Short: "Generates models",
+		Long: `Generates common SQL patterns needed for relational models
 
 forge model is called with the following environment variables:
 
@@ -79,34 +80,32 @@ specified by column_name|cond. cond may be one of:
 	- like: column value like the input
 
 `,
-	Run: func(cmd *cobra.Command, args []string) {
-		if err := model.Execute(model.Opts{
-			Verbose:        modelVerbose,
-			Version:        versionString,
-			Output:         modelOutputFile,
-			Include:        modelInclude,
-			Ignore:         modelIgnore,
-			ModelDirective: modelDirective,
-			QueryDirective: modelQueryDirective,
-			ModelTag:       modelModelTag,
-			QueryTag:       modelQueryTag,
-		}); err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-	},
-	DisableAutoGenTag: true,
+		Run:               c.execModel,
+		DisableAutoGenTag: true,
+	}
+	modelCmd.PersistentFlags().BoolVarP(&c.modelFlags.verbose, "verbose", "v", false, "increase the verbosity of output")
+	modelCmd.PersistentFlags().StringVarP(&c.modelFlags.outputFile, "output", "o", "model_gen.go", "output filename")
+	modelCmd.PersistentFlags().StringVar(&c.modelFlags.include, "include", "", "regex for filenames of files that should be included")
+	modelCmd.PersistentFlags().StringVar(&c.modelFlags.ignore, "ignore", "", "regex for filenames of files that should be ignored")
+	modelCmd.PersistentFlags().StringVar(&c.modelFlags.directive, "model-directive", "forge:model", "comment directive of types that are models")
+	modelCmd.PersistentFlags().StringVar(&c.modelFlags.queryDirective, "query-directive", "forge:model:query", "comment directive of types that are model queries")
+	modelCmd.PersistentFlags().StringVar(&c.modelFlags.modelTag, "model-tag", "model", "go struct tag for defining model fields")
+	modelCmd.PersistentFlags().StringVar(&c.modelFlags.queryTag, "query-tag", "query", "go struct tag for defining query fields")
+	return modelCmd
 }
 
-func init() {
-	rootCmd.AddCommand(modelCmd)
-
-	modelCmd.PersistentFlags().BoolVarP(&modelVerbose, "verbose", "v", false, "increase the verbosity of output")
-	modelCmd.PersistentFlags().StringVarP(&modelOutputFile, "output", "o", "model_gen.go", "output filename")
-	modelCmd.PersistentFlags().StringVar(&modelInclude, "include", "", "regex for filenames of files that should be included")
-	modelCmd.PersistentFlags().StringVar(&modelIgnore, "ignore", "", "regex for filenames of files that should be ignored")
-	modelCmd.PersistentFlags().StringVar(&modelDirective, "model-directive", "forge:model", "comment directive of types that are models")
-	modelCmd.PersistentFlags().StringVar(&modelQueryDirective, "query-directive", "forge:model:query", "comment directive of types that are model queries")
-	modelCmd.PersistentFlags().StringVar(&modelModelTag, "model-tag", "model", "go struct tag for defining model fields")
-	modelCmd.PersistentFlags().StringVar(&modelQueryTag, "query-tag", "query", "go struct tag for defining query fields")
+func (c *Cmd) execModel(cmd *cobra.Command, args []string) {
+	if err := model.Execute(model.Opts{
+		Verbose:        c.modelFlags.verbose,
+		Version:        c.version,
+		Output:         c.modelFlags.outputFile,
+		Include:        c.modelFlags.include,
+		Ignore:         c.modelFlags.ignore,
+		ModelDirective: c.modelFlags.directive,
+		QueryDirective: c.modelFlags.queryDirective,
+		ModelTag:       c.modelFlags.modelTag,
+		QueryTag:       c.modelFlags.queryTag,
+	}); err != nil {
+		log.Fatalln(err)
+	}
 }

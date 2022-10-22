@@ -1,60 +1,59 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
+	"log"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
 )
 
-var (
-	docOutputDir string
+type (
+	docFlags struct {
+		docOutputDir string
+	}
 )
 
-var (
-	// docCmd represents the doc command
-	docCmd = &cobra.Command{
+func (c *Cmd) getDocCmd() *cobra.Command {
+	docCmd := &cobra.Command{
 		Use:               "doc",
 		Short:             "generate documentation for forge",
 		Long:              `generate documentation for forge in several formats`,
 		DisableAutoGenTag: true,
 	}
+	docCmd.PersistentFlags().StringVarP(&c.docFlags.docOutputDir, "output", "o", ".", "documentation output path")
 
-	docManCmd = &cobra.Command{
-		Use:   "man",
-		Short: "generate man page documentation for forge",
-		Long:  `generate man page documentation for forge`,
-		Run: func(cmd *cobra.Command, args []string) {
-			if err := doc.GenManTree(rootCmd, &doc.GenManHeader{
-				Title:   "forge",
-				Section: "1",
-			}, docOutputDir); err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				os.Exit(1)
-			}
-		},
+	docManCmd := &cobra.Command{
+		Use:               "man",
+		Short:             "generate man page documentation for forge",
+		Long:              `generate man page documentation for forge`,
+		Run:               c.execDocManCmd,
 		DisableAutoGenTag: true,
 	}
-
-	docMdCmd = &cobra.Command{
-		Use:   "md",
-		Short: "generate markdown documentation for forge",
-		Long:  `generate markdown documentation for forge`,
-		Run: func(cmd *cobra.Command, args []string) {
-			if err := doc.GenMarkdownTree(rootCmd, docOutputDir); err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				os.Exit(1)
-			}
-		},
-		DisableAutoGenTag: true,
-	}
-)
-
-func init() {
-	rootCmd.AddCommand(docCmd)
 	docCmd.AddCommand(docManCmd)
+
+	docMdCmd := &cobra.Command{
+		Use:               "md",
+		Short:             "generate markdown documentation for forge",
+		Long:              `generate markdown documentation for forge`,
+		Run:               c.execDocMdCmd,
+		DisableAutoGenTag: true,
+	}
 	docCmd.AddCommand(docMdCmd)
 
-	docCmd.PersistentFlags().StringVarP(&docOutputDir, "output", "o", ".", "documentation output path")
+	return docCmd
+}
+
+func (c *Cmd) execDocManCmd(cmd *cobra.Command, args []string) {
+	if err := doc.GenManTree(c.rootCmd, &doc.GenManHeader{
+		Title:   "forge",
+		Section: "1",
+	}, c.docFlags.docOutputDir); err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func (c *Cmd) execDocMdCmd(cmd *cobra.Command, args []string) {
+	if err := doc.GenMarkdownTree(c.rootCmd, c.docFlags.docOutputDir); err != nil {
+		log.Fatalln(err)
+	}
 }

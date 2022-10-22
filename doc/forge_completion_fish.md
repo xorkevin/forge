@@ -1,17 +1,18 @@
 ## forge completion fish
 
-generate the autocompletion script for fish
+Generate the autocompletion script for fish
 
 ### Synopsis
-
 
 Generate the autocompletion script for the fish shell.
 
 To load completions in your current shell session:
-$ forge completion fish | source
+
+	forge completion fish | source
 
 To load completions for every new session, execute once:
-$ forge completion fish > ~/.config/fish/completions/forge.fish
+
+	forge completion fish > ~/.config/fish/completions/forge.fish
 
 You will need to start a new shell for this setup to take effect.
 
@@ -36,5 +37,5 @@ forge completion fish [flags]
 
 ### SEE ALSO
 
-* [forge completion](forge_completion.md)	 - generate the autocompletion script for the specified shell
+* [forge completion](forge_completion.md)	 - Generate the autocompletion script for the specified shell
 

@@ -56,7 +56,7 @@ specified by column_name|cond. cond may be one of:
 	- leq: column value less than or equal to the input
 	- gt: column value greater than the input
 	- geq: column value greater than or equal to the input
-	- arr: column value equals one of the values of the input set
+	- in: column value equals one of the values of the input set
 	- like: column value like the input
 
 
@@ -68,14 +68,15 @@ forge model [query ...] [flags]
 ### Options
 
 ```
-  -h, --help               help for model
-  -m, --model string       name of the model identifier
-      --model-tag string   go struct tag for defining model fields (default "model")
-  -o, --output string      output filename (default "model_gen.go")
-  -p, --prefix string      prefix of identifiers in generated file
-      --query-tag string   go struct tag for defining query fields (default "query")
-  -t, --table string       name of the table in the database
-  -v, --verbose            increase the verbosity of output
+  -h, --help                     help for model
+      --ignore string            regex for filenames of files that should be ignored
+      --include string           regex for filenames of files that should be included
+      --model-directive string   comment directive of types that are models (default "forge:model")
+      --model-tag string         go struct tag for defining model fields (default "model")
+  -o, --output string            output filename (default "model_gen.go")
+      --query-directive string   comment directive of types that are model queries (default "forge:model:query")
+      --query-tag string         go struct tag for defining query fields (default "query")
+  -v, --verbose                  increase the verbosity of output
 ```
 
 ### Options inherited from parent commands

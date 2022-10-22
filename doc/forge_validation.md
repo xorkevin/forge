@@ -6,6 +6,11 @@ Generates validations
 
 Generates common validation on go structs
 
+forge validation is called with the following environment variables:
+
+	GOPACKAGE: name of the go package
+	GOFILE: name of the go source file
+
 forge validation code generates a validation method for structs, where for
 every struct field tagged with valid, a function based on the tag value will be
 called.
@@ -89,13 +94,16 @@ forge validation [query ...] [flags]
 ### Options
 
 ```
+      --directive string      comment directive of types that should be validated (default "forge:valid")
+      --field-tag string      go struct field tag for defining validations (default "valid")
       --has-prefix string     prefix of has functions (default "validhas")
   -h, --help                  help for validation
+      --ignore string         regex for filenames of files that should be ignored
+      --include string        regex for filenames of files that should be included
       --opt-prefix string     prefix of opt functions (default "validopt")
   -o, --output string         output filename (default "validation_gen.go")
   -p, --prefix string         prefix of identifiers in generated file (default "valid")
       --valid-prefix string   prefix of validation functions (default "valid")
-      --validate-tag string   go struct tag for defining field validations (default "valid")
   -v, --verbose               increase the verbosity of output
 ```
 
