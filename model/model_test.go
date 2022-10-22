@@ -31,14 +31,14 @@ func TestGenerate(t *testing.T) {
 
 type (
 	//forge:model user
-	//forge:query user
+	//forge:model:query user
 	Model struct {
 		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"userid;getoneeq,userid;deleq,userid|eq"` + "`" + `
 		Username string ` + "`" + `model:"username,VARCHAR(255) NOT NULL UNIQUE;index,first_name" query:"username;getoneeq,username"` + "`" + `
 		FirstName string ` + "`" + `model:"first_name,VARCHAR(255) NOT NULL" query:"first_name"` + "`" + `
 	}
 
-	//forge:query user
+	//forge:model:query user
 	userProps struct {
 		Username string ` + "`" + `query:"username;updeq,userid"` + "`" + `
 		FirstName string ` + "`" + `query:"first_name"` + "`" + `
@@ -51,7 +51,7 @@ type (
 	}
 
 	//forge:model sm
-	//forge:query sm
+	//forge:model:query sm
 	SM struct {
 		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"userid;getoneeq,userid|neq,username|lt,first_name|leq,last_name|gt,email|geq"` + "`" + `
 		Username string ` + "`" + `model:"username,VARCHAR(255)" query:"username"` + "`" + `
@@ -68,7 +68,7 @@ type (
 					Data: []byte(`package somepackage
 
 type(
-	//forge:query user
+	//forge:model:query user
 	Info struct {
 		Userid string ` + "`" + `query:"userid;getgroup;getgroupeq,userid|in"` + "`" + `
 		Username string ` + "`" + `query:"username;getgroupeq,username|like"` + "`" + `
@@ -82,7 +82,7 @@ type(
 					Data: []byte(`package somepackage
 
 type(
-	//forge:query user
+	//forge:model:query user
 	InfoAgain struct {
 		Userid string ` + "`" + `query:"userid;getgroup;getgroupeq,userid|in"` + "`" + `
 		Username string ` + "`" + `query:"username;getgroupeq,username|like"` + "`" + `
@@ -524,7 +524,7 @@ type (
 
 type (
 	//forge:model user
-	//forge:query
+	//forge:model:query
 	Model struct {
 		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
 	}
@@ -544,7 +544,7 @@ type (
 
 type (
 	//forge:model user
-	//forge:query dne
+	//forge:model:query dne
 	Model struct {
 		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
 	}
@@ -569,7 +569,7 @@ type (
 	}
 )
 
-//forge:query user
+//forge:model:query user
 const (
 	foo = "bar"
 )
@@ -592,7 +592,7 @@ type (
 		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
 	}
 
-	//forge:query user
+	//forge:model:query user
 	Info []string
 )
 `),
@@ -610,7 +610,7 @@ type (
 
 type (
 	//forge:model user
-	//forge:query user
+	//forge:model:query user
 	Model struct {
 		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
 	}
@@ -630,7 +630,7 @@ type (
 
 type (
 	//forge:model user
-	//forge:query user
+	//forge:model:query user
 	Model struct {
 		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
 		Other, Another string ` + "`" + `query:"userid"` + "`" + `
@@ -651,7 +651,7 @@ type (
 
 type (
 	//forge:model user
-	//forge:query user
+	//forge:model:query user
 	Model struct {
 		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:""` + "`" + `
 	}
@@ -671,7 +671,7 @@ type (
 
 type (
 	//forge:model user
-	//forge:query user
+	//forge:model:query user
 	Model struct {
 		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"bogus,getoneeq,userid"` + "`" + `
 	}
@@ -691,7 +691,7 @@ type (
 
 type (
 	//forge:model user
-	//forge:query user
+	//forge:model:query user
 	Model struct {
 		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"userid"` + "`" + `
 	}
@@ -711,7 +711,7 @@ type (
 
 type (
 	//forge:model user
-	//forge:query user
+	//forge:model:query user
 	Model struct {
 		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"userid;bogus"` + "`" + `
 	}
@@ -731,7 +731,7 @@ type (
 
 type (
 	//forge:model user
-	//forge:query user
+	//forge:model:query user
 	Model struct {
 		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"userid;getoneeq"` + "`" + `
 	}
@@ -751,7 +751,7 @@ type (
 
 type (
 	//forge:model user
-	//forge:query user
+	//forge:model:query user
 	Model struct {
 		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"userid;getgroup,userid"` + "`" + `
 	}
@@ -771,7 +771,7 @@ type (
 
 type (
 	//forge:model user
-	//forge:query user
+	//forge:model:query user
 	Model struct {
 		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"userid;getoneeq,userid|bogus"` + "`" + `
 	}
@@ -791,7 +791,7 @@ type (
 
 type (
 	//forge:model user
-	//forge:query user
+	//forge:model:query user
 	Model struct {
 		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"userid;getoneeq,bogus"` + "`" + `
 	}
@@ -818,7 +818,7 @@ type (
 				Include:        "stuff",
 				Ignore:         `_again\.go$`,
 				ModelDirective: "forge:model",
-				QueryDirective: "forge:query",
+				QueryDirective: "forge:model:query",
 				ModelTag:       "model",
 				QueryTag:       "query",
 			}, ExecEnv{
@@ -861,7 +861,7 @@ type (
 				Include:        `\y`,
 				Ignore:         `_again\.go$`,
 				ModelDirective: "forge:model",
-				QueryDirective: "forge:query",
+				QueryDirective: "forge:model:query",
 				ModelTag:       "model",
 				QueryTag:       "query",
 			}, ExecEnv{
@@ -883,7 +883,7 @@ type (
 				Include:        "stuff",
 				Ignore:         `\y`,
 				ModelDirective: "forge:model",
-				QueryDirective: "forge:query",
+				QueryDirective: "forge:model:query",
 				ModelTag:       "model",
 				QueryTag:       "query",
 			}, ExecEnv{
@@ -921,7 +921,7 @@ type (
 			Include:        "",
 			Ignore:         "",
 			ModelDirective: "forge:model",
-			QueryDirective: "forge:query",
+			QueryDirective: "forge:model:query",
 			ModelTag:       "model",
 			QueryTag:       "query",
 		}, ExecEnv{
