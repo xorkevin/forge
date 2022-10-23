@@ -3,7 +3,7 @@
 all: install
 
 install:
-	go install .
+	go install -trimpath -ldflags "-w -s" .
 
 .PHONY: test coverage cover
 
