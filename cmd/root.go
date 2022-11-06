@@ -67,8 +67,7 @@ func (c *Cmd) initConfig(cmd *cobra.Command, args []string) {
 		viper.AddConfigPath(".")
 
 		// Search config in XDG_CONFIG_HOME directory with name ".forge" (without extension).
-		cfgdir, err := os.UserConfigDir()
-		if err == nil {
+		if cfgdir, err := os.UserConfigDir(); err == nil {
 			viper.AddConfigPath(cfgdir)
 		}
 	}
