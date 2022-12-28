@@ -112,7 +112,7 @@ func Execute(opts Opts) error {
 		fmt.Sprintf("Source file: %s", gofile),
 	}, "; "))
 
-	return Generate(writefs.NewOS("."), os.DirFS("."), opts, ExecEnv{
+	return Generate(writefs.NewOSFS("."), os.DirFS("."), opts, ExecEnv{
 		GoPackage: gopackage,
 	})
 }

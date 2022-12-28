@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"xorkevin.dev/forge/gopackages"
-	"xorkevin.dev/forge/writefs"
+	"xorkevin.dev/forge/writefs/writefstest"
 )
 
 func TestGenerate(t *testing.T) {
@@ -810,7 +810,7 @@ type (
 
 			assert := require.New(t)
 
-			outputfs := writefs.NewFSMock()
+			outputfs := writefstest.MapFS{}
 			err := Generate(outputfs, tc.Fsys, Opts{
 				Verbose:        true,
 				Version:        "dev",
@@ -829,9 +829,9 @@ type (
 				return
 			}
 			assert.NoError(err)
-			assert.Len(outputfs.Files, len(tc.Output))
+			assert.Len(outputfs, len(tc.Output))
 			for k, v := range tc.Output {
-				assert.Equal(v, outputfs.Files[k])
+				assert.Equal([]byte(v), outputfs[k].Data)
 			}
 		})
 	}
@@ -853,7 +853,7 @@ type (
 
 			assert := require.New(t)
 
-			outputfs := writefs.NewFSMock()
+			outputfs := writefstest.MapFS{}
 			err := Generate(outputfs, fsys, Opts{
 				Verbose:        true,
 				Version:        "dev",
@@ -875,7 +875,7 @@ type (
 
 			assert := require.New(t)
 
-			outputfs := writefs.NewFSMock()
+			outputfs := writefstest.MapFS{}
 			err := Generate(outputfs, fsys, Opts{
 				Verbose:        true,
 				Version:        "dev",
@@ -913,7 +913,7 @@ type (
 			},
 		}
 
-		outputfs := writefs.NewFSMock()
+		outputfs := writefstest.MapFS{}
 		err := Generate(outputfs, fsys, Opts{
 			Verbose:        true,
 			Version:        "dev",
