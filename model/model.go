@@ -3,6 +3,7 @@ package model
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/printer"
@@ -22,7 +23,7 @@ import (
 )
 
 const (
-	generatedFileMode = 0644
+	generatedFileMode = 0o644
 	generatedFileFlag = os.O_WRONLY | os.O_TRUNC | os.O_CREATE
 )
 
@@ -38,9 +39,11 @@ type (
 func (e ErrorEnv) Error() string {
 	return "Invalid execution environment"
 }
+
 func (e ErrorInvalidFile) Error() string {
 	return "Invalid file"
 }
+
 func (e ErrorInvalidModel) Error() string {
 	return "Invalid model"
 }
@@ -188,7 +191,7 @@ func Execute(opts Opts) error {
 	})
 }
 
-func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) error {
+func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) (retErr error) {
 	var includePattern, ignorePattern *regexp.Regexp
 	if opts.Include != "" {
 		var err error
@@ -284,7 +287,7 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) error 
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			log.Printf("Failed to close open file %s: %v\n", opts.Output, err)
+			retErr = errors.Join(retErr, kerrors.WithMsg(err, fmt.Sprintf("Failed to close open file %s", opts.Output)))
 		}
 	}()
 	fwriter := bufio.NewWriter(file)

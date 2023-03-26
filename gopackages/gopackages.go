@@ -1,11 +1,11 @@
 package gopackages
 
 import (
+	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"io/fs"
-	"log"
 	"path"
 	"regexp"
 	"sort"
@@ -70,14 +70,14 @@ func ReadDir(fsys fs.FS, include, ignore *regexp.Regexp) (*ast.Package, *token.F
 	}, fset, nil
 }
 
-func parseGoFile(fset *token.FileSet, fsys fs.FS, filename string) (*ast.File, error) {
+func parseGoFile(fset *token.FileSet, fsys fs.FS, filename string) (_ *ast.File, retErr error) {
 	file, err := fsys.Open(filename)
 	if err != nil {
 		return nil, kerrors.WithMsg(err, "Failed to open file")
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			log.Println(kerrors.WithMsg(err, "Failed to close open file"))
+			retErr = errors.Join(retErr, kerrors.WithMsg(err, "Failed to close open file"))
 		}
 	}()
 	astfile, err := parser.ParseFile(fset, filename, file, parser.ParseComments)
