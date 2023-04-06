@@ -6,6 +6,7 @@ package {{.Package}}
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"xorkevin.dev/governor/service/db"

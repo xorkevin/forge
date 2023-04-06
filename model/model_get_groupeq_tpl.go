@@ -1,7 +1,7 @@
 package model
 
 const templateGetGroupEq = `
-func (t *{{.Prefix}}ModelTable) Get{{.ModelIdent}}{{.SQLCond.IdentNames}}Ord{{.PrimaryField.Ident}}(ctx context.Context, d db.SQLExecutor, {{.SQLCond.IdentParams}}, orderasc bool, limit, offset int) ([]{{.ModelIdent}}, error) {
+func (t *{{.Prefix}}ModelTable) Get{{.ModelIdent}}{{.SQLCond.IdentNames}}Ord{{.PrimaryField.Ident}}(ctx context.Context, d db.SQLExecutor, {{.SQLCond.IdentParams}}, orderasc bool, limit, offset int) (_ []{{.ModelIdent}}, retErr error) {
 	{{- if .SQLCond.ArrIdentArgs }}
 	paramCount := {{.SQLCond.ParamCount}}
 	args := make([]interface{}, 0, paramCount{{with .SQLCond.ArrIdentArgsLen}}+{{.}}{{end}})
@@ -30,6 +30,7 @@ func (t *{{.Prefix}}ModelTable) Get{{.ModelIdent}}{{.SQLCond.IdentNames}}Ord{{.P
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
+			retErr = errors.Join(retErr, fmt.Errorf("Failed to close db rows: %w", err))
 		}
 	}()
 	for rows.Next() {

@@ -1,7 +1,7 @@
 package model
 
 const templateGetGroup = `
-func (t *{{.Prefix}}ModelTable) Get{{.ModelIdent}}Ord{{.PrimaryField.Ident}}(ctx context.Context, d db.SQLExecutor, orderasc bool, limit, offset int) ([]{{.ModelIdent}}, error) {
+func (t *{{.Prefix}}ModelTable) Get{{.ModelIdent}}Ord{{.PrimaryField.Ident}}(ctx context.Context, d db.SQLExecutor, orderasc bool, limit, offset int) (_ []{{.ModelIdent}}, retErr error) {
 	order := "DESC"
 	if orderasc {
 		order = "ASC"
@@ -13,6 +13,7 @@ func (t *{{.Prefix}}ModelTable) Get{{.ModelIdent}}Ord{{.PrimaryField.Ident}}(ctx
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
+			retErr = errors.Join(retErr, fmt.Errorf("Failed to close db rows: %w", err))
 		}
 	}()
 	for rows.Next() {

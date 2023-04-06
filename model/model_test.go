@@ -15,7 +15,7 @@ func TestGenerate(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now()
-	var filemode fs.FileMode = 0644
+	var filemode fs.FileMode = 0o644
 
 	for _, tc := range []struct {
 		Name   string
@@ -100,6 +100,7 @@ package somepackage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"xorkevin.dev/governor/service/db"
@@ -150,7 +151,7 @@ func (t *userModelTable) InsertBulk(ctx context.Context, d db.SQLExecutor, model
 	return nil
 }
 
-func (t *userModelTable) GetInfoOrdUserid(ctx context.Context, d db.SQLExecutor, orderasc bool, limit, offset int) ([]Info, error) {
+func (t *userModelTable) GetInfoOrdUserid(ctx context.Context, d db.SQLExecutor, orderasc bool, limit, offset int) (_ []Info, retErr error) {
 	order := "DESC"
 	if orderasc {
 		order = "ASC"
@@ -162,6 +163,7 @@ func (t *userModelTable) GetInfoOrdUserid(ctx context.Context, d db.SQLExecutor,
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
+			retErr = errors.Join(retErr, fmt.Errorf("Failed to close db rows: %w", err))
 		}
 	}()
 	for rows.Next() {
@@ -177,7 +179,7 @@ func (t *userModelTable) GetInfoOrdUserid(ctx context.Context, d db.SQLExecutor,
 	return res, nil
 }
 
-func (t *userModelTable) GetInfoHasUseridOrdUserid(ctx context.Context, d db.SQLExecutor, userids []string, orderasc bool, limit, offset int) ([]Info, error) {
+func (t *userModelTable) GetInfoHasUseridOrdUserid(ctx context.Context, d db.SQLExecutor, userids []string, orderasc bool, limit, offset int) (_ []Info, retErr error) {
 	paramCount := 2
 	args := make([]interface{}, 0, paramCount+len(userids))
 	args = append(args, limit, offset)
@@ -202,6 +204,7 @@ func (t *userModelTable) GetInfoHasUseridOrdUserid(ctx context.Context, d db.SQL
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
+			retErr = errors.Join(retErr, fmt.Errorf("Failed to close db rows: %w", err))
 		}
 	}()
 	for rows.Next() {
@@ -217,7 +220,7 @@ func (t *userModelTable) GetInfoHasUseridOrdUserid(ctx context.Context, d db.SQL
 	return res, nil
 }
 
-func (t *userModelTable) GetInfoLikeUsernameOrdUsername(ctx context.Context, d db.SQLExecutor, usernamePrefix string, orderasc bool, limit, offset int) ([]Info, error) {
+func (t *userModelTable) GetInfoLikeUsernameOrdUsername(ctx context.Context, d db.SQLExecutor, usernamePrefix string, orderasc bool, limit, offset int) (_ []Info, retErr error) {
 	order := "DESC"
 	if orderasc {
 		order = "ASC"
@@ -229,6 +232,7 @@ func (t *userModelTable) GetInfoLikeUsernameOrdUsername(ctx context.Context, d d
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
+			retErr = errors.Join(retErr, fmt.Errorf("Failed to close db rows: %w", err))
 		}
 	}()
 	for rows.Next() {
