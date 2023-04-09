@@ -63,11 +63,14 @@ of writing them by hand.`,
 // initConfig reads in config file and ENV variables if set.
 func (c *Cmd) initConfig(cmd *cobra.Command, args []string) {
 	logWriter := klog.NewSyncWriter(os.Stderr)
-	var handler klog.Handler
+	var handler *klog.SlogHandler
 	if c.rootFlags.logJSON {
 		handler = klog.NewJSONSlogHandler(logWriter)
 	} else {
 		handler = klog.NewTextSlogHandler(logWriter)
+		handler.FieldTimeInfo = ""
+		handler.FieldCaller = ""
+		handler.FieldMod = ""
 	}
 	c.log = klog.NewLevelLogger(klog.New(
 		klog.OptHandler(handler),

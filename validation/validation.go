@@ -79,6 +79,10 @@ type (
 	}
 )
 
+func (f validationField) String() string {
+	return f.Ident + ":" + f.Key
+}
+
 type (
 	Opts struct {
 		Output      string
@@ -99,8 +103,6 @@ type (
 
 // Execute runs forge validation generation
 func Execute(log klog.Logger, version string, opts Opts) error {
-	l := klog.NewLevelLogger(log)
-
 	gopackage := os.Getenv("GOPACKAGE")
 	if len(gopackage) == 0 {
 		return kerrors.WithKind(nil, ErrorEnv{}, "Environment variable GOPACKAGE not provided by go generate")
@@ -114,8 +116,6 @@ func Execute(log klog.Logger, version string, opts Opts) error {
 		klog.AString("package", gopackage),
 		klog.AString("source", gofile),
 	)
-
-	l.Info(ctx, "Generating validation")
 
 	return Generate(ctx, log, kfs.DirFS("."), os.DirFS("."), version, opts, ExecEnv{
 		GoPackage: gopackage,
@@ -191,13 +191,7 @@ func Generate(ctx context.Context, log klog.Logger, outputfs fs.FS, inputfs fs.F
 
 	for _, i := range validations {
 		vctx := klog.CtxWithAttrs(ctx, klog.AString("validation", i.Ident))
-		l.Info(vctx, "Detected validation")
-		for _, j := range i.Fields {
-			l.Info(vctx, "validation field",
-				klog.AString("field", j.Ident),
-				klog.AString("key", j.Key),
-			)
-		}
+		l.Debug(vctx, "Detected validation", klog.AAny("fields", i.Fields))
 
 		tplData := validationTemplateData{
 			Prefix:      opts.Prefix,
@@ -216,7 +210,7 @@ func Generate(ctx context.Context, log klog.Logger, outputfs fs.FS, inputfs fs.F
 		return kerrors.WithMsg(err, fmt.Sprintf("Failed to write to file: %s", opts.Output))
 	}
 
-	l.Info(ctx, "Generated file", klog.AString("output", opts.Output))
+	l.Info(ctx, "Generated validation file", klog.AString("output", opts.Output))
 	return nil
 }
 

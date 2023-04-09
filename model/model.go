@@ -152,6 +152,14 @@ type (
 	}
 )
 
+func (f modelField) String() string {
+	return f.Ident + ":" + f.GoType
+}
+
+func (f queryField) String() string {
+	return f.Ident + ":" + f.GoType
+}
+
 type (
 	Opts struct {
 		Output         string
@@ -170,8 +178,6 @@ type (
 
 // Execute runs forge model generation
 func Execute(log klog.Logger, version string, opts Opts) error {
-	l := klog.NewLevelLogger(log)
-
 	gopackage := os.Getenv("GOPACKAGE")
 	if len(gopackage) == 0 {
 		return kerrors.WithKind(nil, ErrorEnv{}, "Environment variable GOPACKAGE not provided by go generate")
@@ -185,8 +191,6 @@ func Execute(log klog.Logger, version string, opts Opts) error {
 		klog.AString("package", gopackage),
 		klog.AString("source", gofile),
 	)
-
-	l.Info(ctx, "Generating model")
 
 	return Generate(ctx, log, kfs.DirFS("."), os.DirFS("."), version, opts, ExecEnv{
 		GoPackage: gopackage,
@@ -307,13 +311,7 @@ func Generate(ctx context.Context, log klog.Logger, outputfs fs.FS, inputfs fs.F
 
 	for _, i := range modelDefs {
 		mctx := klog.CtxWithAttrs(ctx, klog.AString("model", i.Ident))
-		l.Info(mctx, "Detected model")
-		for _, j := range i.Fields {
-			l.Info(mctx, "model field",
-				klog.AString("field", j.Ident),
-				klog.AString("gotype", j.GoType),
-			)
-		}
+		l.Debug(mctx, "Detected model", klog.AAny("fields", i.Fields))
 
 		tplData := modelTemplateData{
 			Prefix:     i.Prefix,
@@ -325,13 +323,7 @@ func Generate(ctx context.Context, log klog.Logger, outputfs fs.FS, inputfs fs.F
 		}
 		for _, j := range queryDefs[i.Prefix] {
 			qctx := klog.CtxWithAttrs(mctx, klog.AString("query", j.Ident))
-			l.Info(qctx, "Detected query")
-			for _, k := range j.Fields {
-				l.Info(qctx, "query field",
-					klog.AString("field", k.Ident),
-					klog.AString("gotype", k.GoType),
-				)
-			}
+			l.Debug(qctx, "Detected query", klog.AAny("fields", j.Fields))
 
 			querySQLStrings := j.genQuerySQL()
 			numFields := len(j.Fields)
@@ -363,7 +355,7 @@ func Generate(ctx context.Context, log klog.Logger, outputfs fs.FS, inputfs fs.F
 		return kerrors.WithMsg(err, fmt.Sprintf("Failed to write to file: %s", opts.Output))
 	}
 
-	l.Info(ctx, "Generated file", klog.AString("output", opts.Output))
+	l.Info(ctx, "Generated model file", klog.AString("output", opts.Output))
 	return nil
 }
 
