@@ -1,5 +1,5 @@
 .nh
-.TH "forge" "1" "Oct 2022" "" ""
+.TH "forge" "1" "Apr 2023" "" ""
 
 .SH NAME
 .PP
@@ -195,19 +195,15 @@ The "opt" suffix is a feature designed to allow certain fields to be omitted.
 \fB--valid-prefix\fP="valid"
 	prefix of validation functions
 
-.PP
-\fB-v\fP, \fB--verbose\fP[=false]
-	increase the verbosity of output
-
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 .PP
-\fB--config\fP=""
-	config file (default is $XDG_CONFIG_HOME/.forge.yaml)
+\fB--log-json\fP[=false]
+	output json logs
 
 .PP
-\fB--debug\fP[=false]
-	turn on debug output
+\fB--log-level\fP="info"
+	log level
 
 
 .SH SEE ALSO

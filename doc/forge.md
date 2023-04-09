@@ -10,9 +10,9 @@ of writing them by hand.
 ### Options
 
 ```
-      --config string   config file (default is $XDG_CONFIG_HOME/.forge.yaml)
-      --debug           turn on debug output
-  -h, --help            help for forge
+  -h, --help               help for forge
+      --log-json           output json logs
+      --log-level string   log level (default "info")
 ```
 
 ### SEE ALSO

@@ -104,14 +104,13 @@ forge validation [query ...] [flags]
   -o, --output string         output filename (default "validation_gen.go")
   -p, --prefix string         prefix of identifiers in generated file (default "valid")
       --valid-prefix string   prefix of validation functions (default "valid")
-  -v, --verbose               increase the verbosity of output
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --config string   config file (default is $XDG_CONFIG_HOME/.forge.yaml)
-      --debug           turn on debug output
+      --log-json           output json logs
+      --log-level string   log level (default "info")
 ```
 
 ### SEE ALSO

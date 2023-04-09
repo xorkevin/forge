@@ -1,5 +1,5 @@
 .nh
-.TH "forge" "1" "Oct 2022" "" ""
+.TH "forge" "1" "Apr 2023" "" ""
 
 .SH NAME
 .PP
@@ -51,8 +51,13 @@ Fields without a "model" tag are ignored.
 
 .PP
 Valid opts are:
-	- index: args(field,...), creates a index from the provided fields and
-	current field
+
+.RS
+.IP \(bu 2
+index: args(field,...), creates a index from the provided fields and
+current field
+
+.RE
 
 .PP
 A query allows additional common case select statements to be code generated.
@@ -77,27 +82,48 @@ Fields without a "query" tag are ignored.
 
 .PP
 Valid flags are:
-	- getoneeq: args(equal_field,...), gets a single row where the equal field(s)
-	are equal to the input
-	- getgroup: (no args), gets all rows ordered by the field value
-	- getgroupeq: args(equal_field,...), gets all rows where the equal field(s)
-	are equal to the input ordered by the field value
-	- updeq: args(equal_field,...), updates all rows where the equal fields(s)
-	are equal to the input
-	- deleq: args(equal_field,...), deletes all rows where the equal fields(s)
-	are equal to the input
+
+.RS
+.IP \(bu 2
+getoneeq: args(equal_field,...), gets a single row where the equal field(s)
+are equal to the input
+.IP \(bu 2
+getgroup: (no args), gets all rows ordered by the field value
+.IP \(bu 2
+getgroupeq: args(equal_field,...), gets all rows where the equal field(s)
+are equal to the input ordered by the field value
+.IP \(bu 2
+updeq: args(equal_field,...), updates all rows where the equal fields(s)
+are equal to the input
+.IP \(bu 2
+deleq: args(equal_field,...), deletes all rows where the equal fields(s)
+are equal to the input
+
+.RE
 
 .PP
 equal_field by default has a condition of eq, but it may be explicitly
 specified by column_name|cond. cond may be one of:
-	- eq: column value equals the input
-	- neq: column value not equal to the input
-	- lt: column value less than the input
-	- leq: column value less than or equal to the input
-	- gt: column value greater than the input
-	- geq: column value greater than or equal to the input
-	- in: column value equals one of the values of the input set
-	- like: column value like the input
+
+.RS
+.IP \(bu 2
+eq: column value equals the input
+.IP \(bu 2
+neq: column value not equal to the input
+.IP \(bu 2
+lt: column value less than the input
+.IP \(bu 2
+leq: column value less than or equal to the input
+.IP \(bu 2
+gt: column value greater than the input
+.IP \(bu 2
+geq: column value greater than or equal to the input
+.IP \(bu 2
+in: column value equals one of the values of the input set
+.IP \(bu 2
+like: column value like the input
+
+.RE
 
 
 .SH OPTIONS
@@ -133,19 +159,15 @@ specified by column_name|cond. cond may be one of:
 \fB--query-tag\fP="query"
 	go struct tag for defining query fields
 
-.PP
-\fB-v\fP, \fB--verbose\fP[=false]
-	increase the verbosity of output
-
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 .PP
-\fB--config\fP=""
-	config file (default is $XDG_CONFIG_HOME/.forge.yaml)
+\fB--log-json\fP[=false]
+	output json logs
 
 .PP
-\fB--debug\fP[=false]
-	turn on debug output
+\fB--log-level\fP="info"
+	log level
 
 
 .SH SEE ALSO

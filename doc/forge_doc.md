@@ -16,8 +16,8 @@ generate documentation for forge in several formats
 ### Options inherited from parent commands
 
 ```
-      --config string   config file (default is $XDG_CONFIG_HOME/.forge.yaml)
-      --debug           turn on debug output
+      --log-json           output json logs
+      --log-level string   log level (default "info")
 ```
 
 ### SEE ALSO
