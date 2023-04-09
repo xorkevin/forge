@@ -3,13 +3,13 @@ package model
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"go/ast"
 	"go/printer"
 	"go/token"
 	"io/fs"
-	"log"
 	"os"
 	"reflect"
 	"regexp"
@@ -18,8 +18,9 @@ import (
 	"text/template"
 
 	"xorkevin.dev/forge/gopackages"
-	"xorkevin.dev/forge/writefs"
 	"xorkevin.dev/kerrors"
+	"xorkevin.dev/kfs"
+	"xorkevin.dev/klog"
 )
 
 const (
@@ -153,8 +154,6 @@ type (
 
 type (
 	Opts struct {
-		Verbose        bool
-		Version        string
 		Output         string
 		Include        string
 		Ignore         string
@@ -170,7 +169,9 @@ type (
 )
 
 // Execute runs forge model generation
-func Execute(opts Opts) error {
+func Execute(log klog.Logger, version string, opts Opts) error {
+	l := klog.NewLevelLogger(log)
+
 	gopackage := os.Getenv("GOPACKAGE")
 	if len(gopackage) == 0 {
 		return kerrors.WithKind(nil, ErrorEnv{}, "Environment variable GOPACKAGE not provided by go generate")
@@ -180,18 +181,21 @@ func Execute(opts Opts) error {
 		return kerrors.WithKind(nil, ErrorEnv{}, "Environment variable GOFILE not provided by go generate")
 	}
 
-	log.Println(strings.Join([]string{
-		"Generating model",
-		fmt.Sprintf("Package: %s", gopackage),
-		fmt.Sprintf("Source file: %s", gofile),
-	}, "; "))
+	ctx := klog.CtxWithAttrs(context.Background(),
+		klog.AString("package", gopackage),
+		klog.AString("source", gofile),
+	)
 
-	return Generate(writefs.NewOSFS("."), os.DirFS("."), opts, ExecEnv{
+	l.Info(ctx, "Generating model")
+
+	return Generate(ctx, log, kfs.DirFS("."), os.DirFS("."), version, opts, ExecEnv{
 		GoPackage: gopackage,
 	})
 }
 
-func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) (retErr error) {
+func Generate(ctx context.Context, log klog.Logger, outputfs fs.FS, inputfs fs.FS, version string, opts Opts, env ExecEnv) (retErr error) {
+	l := klog.NewLevelLogger(log)
+
 	var includePattern, ignorePattern *regexp.Regexp
 	if opts.Include != "" {
 		var err error
@@ -281,7 +285,7 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) (retEr
 		return kerrors.WithMsg(err, "Failed to parse template templateDelEq")
 	}
 
-	file, err := outputfs.OpenFile(opts.Output, generatedFileFlag, generatedFileMode)
+	file, err := kfs.OpenFile(outputfs, opts.Output, generatedFileFlag, generatedFileMode)
 	if err != nil {
 		return kerrors.WithMsg(err, fmt.Sprintf("Failed to write file %s", opts.Output))
 	}
@@ -294,7 +298,7 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) (retEr
 
 	tplData := mainTemplateData{
 		Generator: "go generate forge model",
-		Version:   opts.Version,
+		Version:   version,
 		Package:   env.GoPackage,
 	}
 	if err := tplmain.Execute(fwriter, tplData); err != nil {
@@ -302,27 +306,33 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) (retEr
 	}
 
 	for _, i := range modelDefs {
-		if opts.Verbose {
-			log.Printf("Detected model %s with fields:\n", i.Ident)
-			for _, i := range i.Fields {
-				log.Printf("* %s %s\n", i.Ident, i.GoType)
-			}
+		mctx := klog.CtxWithAttrs(ctx, klog.AString("model", i.Ident))
+		l.Info(mctx, "Detected model")
+		for _, j := range i.Fields {
+			l.Info(mctx, "model field",
+				klog.AString("field", j.Ident),
+				klog.AString("gotype", j.GoType),
+			)
 		}
+
 		tplData := modelTemplateData{
 			Prefix:     i.Prefix,
 			ModelIdent: i.Ident,
 			SQL:        i.genModelSQL(),
 		}
 		if err := tplmodel.Execute(fwriter, tplData); err != nil {
-			return kerrors.WithMsg(err, fmt.Sprintf("Failed to execute model template for struct %s", i.Ident))
+			return kerrors.WithMsg(err, fmt.Sprintf("Failed to execute model template for struct: %s", i.Ident))
 		}
 		for _, j := range queryDefs[i.Prefix] {
-			if opts.Verbose {
-				log.Printf("Detected model %s query %s with fields:", i.Ident, j.Ident)
-				for _, i := range j.Fields {
-					log.Printf("* %s %s\n", i.Ident, i.GoType)
-				}
+			qctx := klog.CtxWithAttrs(mctx, klog.AString("query", j.Ident))
+			l.Info(qctx, "Detected query")
+			for _, k := range j.Fields {
+				l.Info(qctx, "query field",
+					klog.AString("field", k.Ident),
+					klog.AString("gotype", k.GoType),
+				)
 			}
+
 			querySQLStrings := j.genQuerySQL()
 			numFields := len(j.Fields)
 			for _, k := range j.QueryFields {
@@ -350,10 +360,10 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) (retEr
 	}
 
 	if err := fwriter.Flush(); err != nil {
-		return kerrors.WithMsg(err, fmt.Sprintf("Failed to write to file %s", opts.Output))
+		return kerrors.WithMsg(err, fmt.Sprintf("Failed to write to file: %s", opts.Output))
 	}
 
-	log.Printf("Generated file: %s\n", opts.Output)
+	l.Info(ctx, "Generated file", klog.AString("output", opts.Output))
 	return nil
 }
 

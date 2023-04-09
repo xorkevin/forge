@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"log"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
 )
@@ -48,12 +46,14 @@ func (c *Cmd) execDocManCmd(cmd *cobra.Command, args []string) {
 		Title:   "forge",
 		Section: "1",
 	}, c.docFlags.docOutputDir); err != nil {
-		log.Fatalln(err)
+		c.logFatal(err)
+		return
 	}
 }
 
 func (c *Cmd) execDocMdCmd(cmd *cobra.Command, args []string) {
 	if err := doc.GenMarkdownTree(c.rootCmd, c.docFlags.docOutputDir); err != nil {
-		log.Fatalln(err)
+		c.logFatal(err)
+		return
 	}
 }

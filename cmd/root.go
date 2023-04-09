@@ -1,17 +1,18 @@
 package cmd
 
 import (
-	"log"
+	"context"
+	"fmt"
 	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+	"xorkevin.dev/klog"
 )
 
 type (
 	Cmd struct {
 		rootCmd    *cobra.Command
+		log        *klog.LevelLogger
 		version    string
 		rootFlags  rootFlags
 		modelFlags modelFlags
@@ -20,8 +21,8 @@ type (
 	}
 
 	rootFlags struct {
-		cfgFile   string
-		debugMode bool
+		logLevel string
+		logJSON  bool
 	}
 )
 
@@ -44,8 +45,8 @@ of writing them by hand.`,
 		PersistentPreRun:  c.initConfig,
 		DisableAutoGenTag: true,
 	}
-	rootCmd.PersistentFlags().StringVar(&c.rootFlags.cfgFile, "config", "", "config file (default is $XDG_CONFIG_HOME/.forge.yaml)")
-	rootCmd.PersistentFlags().BoolVar(&c.rootFlags.debugMode, "debug", false, "turn on debug output")
+	rootCmd.PersistentFlags().StringVar(&c.rootFlags.logLevel, "log-level", "info", "log level")
+	rootCmd.PersistentFlags().BoolVar(&c.rootFlags.logJSON, "log-json", false, "output json logs")
 	c.rootCmd = rootCmd
 
 	rootCmd.AddCommand(c.getModelCmd())
@@ -53,36 +54,28 @@ of writing them by hand.`,
 	rootCmd.AddCommand(c.getDocCmd())
 
 	if err := rootCmd.Execute(); err != nil {
-		log.Fatalln(err)
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+		return
 	}
 }
 
 // initConfig reads in config file and ENV variables if set.
 func (c *Cmd) initConfig(cmd *cobra.Command, args []string) {
-	if c.rootFlags.cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(c.rootFlags.cfgFile)
+	logWriter := klog.NewSyncWriter(os.Stderr)
+	var handler klog.Handler
+	if c.rootFlags.logJSON {
+		handler = klog.NewJSONSlogHandler(logWriter)
 	} else {
-		viper.SetConfigName(".forge")
-		viper.AddConfigPath(".")
-
-		// Search config in XDG_CONFIG_HOME directory with name ".forge" (without extension).
-		if cfgdir, err := os.UserConfigDir(); err == nil {
-			viper.AddConfigPath(cfgdir)
-		}
+		handler = klog.NewTextSlogHandler(logWriter)
 	}
+	c.log = klog.NewLevelLogger(klog.New(
+		klog.OptHandler(handler),
+		klog.OptMinLevelStr(c.rootFlags.logLevel),
+	))
+}
 
-	viper.SetEnvPrefix("FORGE")
-	viper.AutomaticEnv() // read in environment variables that match
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "__"))
-
-	// If a config file is found, read it in.
-	configErr := viper.ReadInConfig()
-	if c.rootFlags.debugMode {
-		if configErr == nil {
-			log.Printf("Using config file: %s\n", viper.ConfigFileUsed())
-		} else {
-			log.Printf("Failed reading config file: %v\n", configErr)
-		}
-	}
+func (c *Cmd) logFatal(err error) {
+	c.log.Err(context.Background(), err)
+	os.Exit(1)
 }

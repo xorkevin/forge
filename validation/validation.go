@@ -2,11 +2,11 @@ package validation
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"go/ast"
 	"io/fs"
-	"log"
 	"os"
 	"reflect"
 	"regexp"
@@ -14,8 +14,9 @@ import (
 	"text/template"
 
 	"xorkevin.dev/forge/gopackages"
-	"xorkevin.dev/forge/writefs"
 	"xorkevin.dev/kerrors"
+	"xorkevin.dev/kfs"
+	"xorkevin.dev/klog"
 )
 
 const (
@@ -80,8 +81,6 @@ type (
 
 type (
 	Opts struct {
-		Verbose     bool
-		Version     string
 		Output      string
 		Prefix      string
 		PrefixValid string
@@ -99,7 +98,9 @@ type (
 )
 
 // Execute runs forge validation generation
-func Execute(opts Opts) error {
+func Execute(log klog.Logger, version string, opts Opts) error {
+	l := klog.NewLevelLogger(log)
+
 	gopackage := os.Getenv("GOPACKAGE")
 	if len(gopackage) == 0 {
 		return kerrors.WithKind(nil, ErrorEnv{}, "Environment variable GOPACKAGE not provided by go generate")
@@ -109,18 +110,21 @@ func Execute(opts Opts) error {
 		return kerrors.WithKind(nil, ErrorEnv{}, "Environment variable GOFILE not provided by go generate")
 	}
 
-	log.Println(strings.Join([]string{
-		"Generating validation",
-		fmt.Sprintf("Package: %s", gopackage),
-		fmt.Sprintf("Source file: %s", gofile),
-	}, "; "))
+	ctx := klog.CtxWithAttrs(context.Background(),
+		klog.AString("package", gopackage),
+		klog.AString("source", gofile),
+	)
 
-	return Generate(writefs.NewOSFS("."), os.DirFS("."), opts, ExecEnv{
+	l.Info(ctx, "Generating validation")
+
+	return Generate(ctx, log, kfs.DirFS("."), os.DirFS("."), version, opts, ExecEnv{
 		GoPackage: gopackage,
 	})
 }
 
-func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) (retErr error) {
+func Generate(ctx context.Context, log klog.Logger, outputfs fs.FS, inputfs fs.FS, version string, opts Opts, env ExecEnv) (retErr error) {
+	l := klog.NewLevelLogger(log)
+
 	var includePattern, ignorePattern *regexp.Regexp
 	if opts.Include != "" {
 		var err error
@@ -165,7 +169,7 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) (retEr
 		return kerrors.WithMsg(err, "Failed to parse template templateValidate")
 	}
 
-	file, err := outputfs.OpenFile(opts.Output, generatedFileFlag, generatedFileMode)
+	file, err := kfs.OpenFile(outputfs, opts.Output, generatedFileFlag, generatedFileMode)
 	if err != nil {
 		return kerrors.WithMsg(err, fmt.Sprintf("Failed to write file %s", opts.Output))
 	}
@@ -178,7 +182,7 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) (retEr
 
 	tplData := mainTemplateData{
 		Generator: "go generate forge validation",
-		Version:   opts.Version,
+		Version:   version,
 		Package:   env.GoPackage,
 	}
 	if err := tplmain.Execute(fwriter, tplData); err != nil {
@@ -186,12 +190,15 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) (retEr
 	}
 
 	for _, i := range validations {
-		if opts.Verbose {
-			log.Printf("Detected validation %s fields:\n", i.Ident)
-			for _, i := range i.Fields {
-				log.Printf("* %s %s\n", i.Ident, i.Key)
-			}
+		vctx := klog.CtxWithAttrs(ctx, klog.AString("validation", i.Ident))
+		l.Info(vctx, "Detected validation")
+		for _, j := range i.Fields {
+			l.Info(vctx, "validation field",
+				klog.AString("field", j.Ident),
+				klog.AString("key", j.Key),
+			)
 		}
+
 		tplData := validationTemplateData{
 			Prefix:      opts.Prefix,
 			Ident:       i.Ident,
@@ -201,15 +208,15 @@ func Generate(outputfs writefs.FS, inputfs fs.FS, opts Opts, env ExecEnv) (retEr
 			Fields:      i.Fields,
 		}
 		if err := tplvalidate.Execute(fwriter, tplData); err != nil {
-			return kerrors.WithMsg(err, fmt.Sprintf("Failed to execute validation template for struct %s", tplData.Ident))
+			return kerrors.WithMsg(err, fmt.Sprintf("Failed to execute validation template for struct: %s", tplData.Ident))
 		}
 	}
 
 	if err := fwriter.Flush(); err != nil {
-		return kerrors.WithMsg(err, fmt.Sprintf("Failed to write to file %s", opts.Output))
+		return kerrors.WithMsg(err, fmt.Sprintf("Failed to write to file: %s", opts.Output))
 	}
 
-	log.Printf("Generated file: %s\n", opts.Output)
+	l.Info(ctx, "Generated file", klog.AString("output", opts.Output))
 	return nil
 }
 

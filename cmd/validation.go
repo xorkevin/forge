@@ -1,24 +1,14 @@
 package cmd
 
 import (
-	"log"
-
 	"github.com/spf13/cobra"
 	"xorkevin.dev/forge/validation"
+	"xorkevin.dev/klog"
 )
 
 type (
 	validFlags struct {
-		verbose        bool
-		outputFile     string
-		outputPrefix   string
-		validatePrefix string
-		hasPrefix      string
-		optPrefix      string
-		include        string
-		ignore         string
-		directive      string
-		tag            string
+		opts validation.Opts
 	}
 )
 
@@ -111,33 +101,25 @@ The "opt" suffix is a feature designed to allow certain fields to be omitted.
 		Run:               c.execValidation,
 		DisableAutoGenTag: true,
 	}
-	validationCmd.PersistentFlags().BoolVarP(&c.validFlags.verbose, "verbose", "v", false, "increase the verbosity of output")
-	validationCmd.PersistentFlags().StringVarP(&c.validFlags.outputFile, "output", "o", "validation_gen.go", "output filename")
-	validationCmd.PersistentFlags().StringVarP(&c.validFlags.outputPrefix, "prefix", "p", "valid", "prefix of identifiers in generated file")
-	validationCmd.PersistentFlags().StringVar(&c.validFlags.validatePrefix, "valid-prefix", "valid", "prefix of validation functions")
-	validationCmd.PersistentFlags().StringVar(&c.validFlags.hasPrefix, "has-prefix", "validhas", "prefix of has functions")
-	validationCmd.PersistentFlags().StringVar(&c.validFlags.optPrefix, "opt-prefix", "validopt", "prefix of opt functions")
-	validationCmd.PersistentFlags().StringVar(&c.validFlags.include, "include", "", "regex for filenames of files that should be included")
-	validationCmd.PersistentFlags().StringVar(&c.validFlags.ignore, "ignore", "", "regex for filenames of files that should be ignored")
-	validationCmd.PersistentFlags().StringVar(&c.validFlags.directive, "directive", "forge:valid", "comment directive of types that should be validated")
-	validationCmd.PersistentFlags().StringVar(&c.validFlags.tag, "field-tag", "valid", "go struct field tag for defining validations")
+	validationCmd.PersistentFlags().StringVarP(&c.validFlags.opts.Output, "output", "o", "validation_gen.go", "output filename")
+	validationCmd.PersistentFlags().StringVarP(&c.validFlags.opts.Prefix, "prefix", "p", "valid", "prefix of identifiers in generated file")
+	validationCmd.PersistentFlags().StringVar(&c.validFlags.opts.PrefixValid, "valid-prefix", "valid", "prefix of validation functions")
+	validationCmd.PersistentFlags().StringVar(&c.validFlags.opts.PrefixHas, "has-prefix", "validhas", "prefix of has functions")
+	validationCmd.PersistentFlags().StringVar(&c.validFlags.opts.PrefixOpt, "opt-prefix", "validopt", "prefix of opt functions")
+	validationCmd.PersistentFlags().StringVar(&c.validFlags.opts.Include, "include", "", "regex for filenames of files that should be included")
+	validationCmd.PersistentFlags().StringVar(&c.validFlags.opts.Ignore, "ignore", "", "regex for filenames of files that should be ignored")
+	validationCmd.PersistentFlags().StringVar(&c.validFlags.opts.Directive, "directive", "forge:valid", "comment directive of types that should be validated")
+	validationCmd.PersistentFlags().StringVar(&c.validFlags.opts.Tag, "field-tag", "valid", "go struct field tag for defining validations")
 	return validationCmd
 }
 
 func (c *Cmd) execValidation(cmd *cobra.Command, args []string) {
-	if err := validation.Execute(validation.Opts{
-		Verbose:     c.validFlags.verbose,
-		Version:     c.version,
-		Output:      c.validFlags.outputFile,
-		Prefix:      c.validFlags.outputPrefix,
-		PrefixValid: c.validFlags.validatePrefix,
-		PrefixHas:   c.validFlags.hasPrefix,
-		PrefixOpt:   c.validFlags.optPrefix,
-		Include:     c.validFlags.include,
-		Ignore:      c.validFlags.ignore,
-		Directive:   c.validFlags.directive,
-		Tag:         c.validFlags.tag,
-	}); err != nil {
-		log.Fatalln(err)
+	if err := validation.Execute(
+		c.log.Logger.Sublogger("", klog.AString("cmd", "validation")),
+		c.version,
+		c.validFlags.opts,
+	); err != nil {
+		c.logFatal(err)
+		return
 	}
 }
