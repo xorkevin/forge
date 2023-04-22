@@ -44,5 +44,5 @@ xorkevin.dev/kerrors v0.1.5 h1:vszMcLbQjGn2DuqaQZNZNTbGw17qKvfH3X6E1s+1Iac=
 xorkevin.dev/kerrors v0.1.5/go.mod h1:HnfCCdUvvu5aXhHxO8TPa8KU3r5X2c2QZRbfE+HBLvc=
 xorkevin.dev/kfs v0.1.0 h1:93w1WphZXj4c1+56bS9KyNSeniruf4sZ9jIC+OGvlQg=
 xorkevin.dev/kfs v0.1.0/go.mod h1:zDR7znYFDidg6MAoLvyFoPFERZM46gesM7wYtww7mSA=
-xorkevin.dev/klog v0.0.0-20230409052311-08b959cc2a77 h1:dlVTe31lOSpCQwCnzgpdD0lF1dSQdEoUCOPtXayguQM=
-xorkevin.dev/klog v0.0.0-20230409052311-08b959cc2a77/go.mod h1:XTsNnpqNMRoy1t7q6LShju8vI5p/439F27BvJxokqws=
+xorkevin.dev/klog v0.0.0-20230422031314-3f827239fa5d h1:o7GSm8kDwpQoMERUCALK1EYYyXhMhjt+4v5MNE1Ubuk=
+xorkevin.dev/klog v0.0.0-20230422031314-3f827239fa5d/go.mod h1:XTsNnpqNMRoy1t7q6LShju8vI5p/439F27BvJxokqws=

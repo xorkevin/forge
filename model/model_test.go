@@ -2,7 +2,6 @@ package model
 
 import (
 	"context"
-	"io"
 	"io/fs"
 	"testing"
 	"testing/fstest"
@@ -817,12 +816,10 @@ type (
 
 			assert := require.New(t)
 
-			log := klog.New(klog.OptHandler(klog.NewJSONSlogHandler(io.Discard)))
-
 			outputfs := &kfstest.MapFS{
 				Fsys: fstest.MapFS{},
 			}
-			err := Generate(context.Background(), log, outputfs, tc.Fsys, "dev", Opts{
+			err := Generate(context.Background(), klog.Discard{}, outputfs, tc.Fsys, "dev", Opts{
 				Output:         "model_gen.go",
 				Include:        "stuff",
 				Ignore:         `_again\.go$`,
@@ -862,12 +859,10 @@ type (
 
 			assert := require.New(t)
 
-			log := klog.New(klog.OptHandler(klog.NewJSONSlogHandler(io.Discard)))
-
 			outputfs := &kfstest.MapFS{
 				Fsys: fstest.MapFS{},
 			}
-			err := Generate(context.Background(), log, outputfs, fsys, "dev", Opts{
+			err := Generate(context.Background(), klog.Discard{}, outputfs, fsys, "dev", Opts{
 				Output:         "model_gen.go",
 				Include:        `\y`,
 				Ignore:         `_again\.go$`,
@@ -886,12 +881,10 @@ type (
 
 			assert := require.New(t)
 
-			log := klog.New(klog.OptHandler(klog.NewJSONSlogHandler(io.Discard)))
-
 			outputfs := &kfstest.MapFS{
 				Fsys: fstest.MapFS{},
 			}
-			err := Generate(context.Background(), log, outputfs, fsys, "dev", Opts{
+			err := Generate(context.Background(), klog.Discard{}, outputfs, fsys, "dev", Opts{
 				Output:         "model_gen.go",
 				Include:        "stuff",
 				Ignore:         `\y`,
@@ -911,8 +904,6 @@ type (
 
 		assert := require.New(t)
 
-		log := klog.New(klog.OptHandler(klog.NewJSONSlogHandler(io.Discard)))
-
 		fsys := fstest.MapFS{
 			"stuff.go": &fstest.MapFile{
 				Data: []byte(`package somepackage
@@ -931,7 +922,7 @@ type (
 		outputfs := &kfstest.MapFS{
 			Fsys: fstest.MapFS{},
 		}
-		err := Generate(context.Background(), log, outputfs, fsys, "dev", Opts{
+		err := Generate(context.Background(), klog.Discard{}, outputfs, fsys, "dev", Opts{
 			Output:         "model_gen.go",
 			Include:        "",
 			Ignore:         "",

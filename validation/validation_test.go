@@ -2,7 +2,6 @@ package validation
 
 import (
 	"context"
-	"io"
 	"io/fs"
 	"testing"
 	"testing/fstest"
@@ -287,12 +286,10 @@ type (
 
 			assert := require.New(t)
 
-			log := klog.New(klog.OptHandler(klog.NewJSONSlogHandler(io.Discard)))
-
 			outputfs := &kfstest.MapFS{
 				Fsys: fstest.MapFS{},
 			}
-			err := Generate(context.Background(), log, outputfs, tc.Fsys, "dev", Opts{
+			err := Generate(context.Background(), klog.Discard{}, outputfs, tc.Fsys, "dev", Opts{
 				Output:      "validation_gen.go",
 				Prefix:      "valid",
 				PrefixValid: "valid",
@@ -334,12 +331,10 @@ type (
 
 			assert := require.New(t)
 
-			log := klog.New(klog.OptHandler(klog.NewJSONSlogHandler(io.Discard)))
-
 			outputfs := &kfstest.MapFS{
 				Fsys: fstest.MapFS{},
 			}
-			err := Generate(context.Background(), log, outputfs, fsys, "dev", Opts{
+			err := Generate(context.Background(), klog.Discard{}, outputfs, fsys, "dev", Opts{
 				Output:      "validation_gen.go",
 				Prefix:      "valid",
 				PrefixValid: "valid",
@@ -360,12 +355,10 @@ type (
 
 			assert := require.New(t)
 
-			log := klog.New(klog.OptHandler(klog.NewJSONSlogHandler(io.Discard)))
-
 			outputfs := &kfstest.MapFS{
 				Fsys: fstest.MapFS{},
 			}
-			err := Generate(context.Background(), log, outputfs, fsys, "dev", Opts{
+			err := Generate(context.Background(), klog.Discard{}, outputfs, fsys, "dev", Opts{
 				Output:      "validation_gen.go",
 				Prefix:      "valid",
 				PrefixValid: "valid",
@@ -387,8 +380,6 @@ type (
 
 		assert := require.New(t)
 
-		log := klog.New(klog.OptHandler(klog.NewJSONSlogHandler(io.Discard)))
-
 		fsys := fstest.MapFS{
 			"stuff.go": &fstest.MapFile{
 				Data: []byte(`package somepackage
@@ -407,7 +398,7 @@ type (
 		outputfs := &kfstest.MapFS{
 			Fsys: fstest.MapFS{},
 		}
-		err := Generate(context.Background(), log, outputfs, fsys, "dev", Opts{
+		err := Generate(context.Background(), klog.Discard{}, outputfs, fsys, "dev", Opts{
 			Output:      "validation_gen.go",
 			Prefix:      "valid",
 			PrefixValid: "valid",
