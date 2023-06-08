@@ -671,7 +671,7 @@ func parseQueryFields(astfields []astField, fieldMap map[string]modelField) ([]q
 	for n, i := range astfields {
 		dbName, rest, _ := strings.Cut(i.Tags, ";")
 		if len(dbName) < 1 {
-			return nil, nil, kerrors.WithKind(nil, ErrorInvalidModel{}, fmt.Sprintf("Query field tag must be dbname[;flag[,args ...][; ...]] for field %s", i.Ident))
+			return nil, nil, kerrors.WithKind(nil, ErrorInvalidModel{}, fmt.Sprintf("Query field opt must be dbname[;flag[,args ...][; ...]] for field %s", i.Ident))
 		}
 		if mfield, ok := fieldMap[dbName]; !ok || i.GoType != mfield.GoType {
 			return nil, nil, kerrors.WithKind(nil, ErrorInvalidModel{}, fmt.Sprintf("Field %s with type %s does not exist on model", dbName, i.GoType))
@@ -717,7 +717,7 @@ func parseQueryFields(astfields []astField, fieldMap map[string]modelField) ([]q
 					}
 				default:
 					if len(opt) != 1 {
-						return nil, nil, kerrors.WithKind(nil, ErrorInvalidModel{}, fmt.Sprintf("Field tag must be dbname;flag for opt %s on field %s", opt[0], i.Ident))
+						return nil, nil, kerrors.WithKind(nil, ErrorInvalidModel{}, fmt.Sprintf("Query field opt must be dbname;flag for opt %s on field %s", opt[0], i.Ident))
 					}
 				}
 				queryFields = append(queryFields, f)

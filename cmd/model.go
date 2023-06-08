@@ -52,18 +52,18 @@ Fields without a "query" tag are ignored.
 
 Valid flags are:
 
-- getoneeq: args(equal_field,...), gets a single row where the equal field(s)
+- getoneeq: args(field,...), gets a single row where the equal field(s)
   are equal to the input
 - getgroup: (no args), gets all rows ordered by the field value
-- getgroupeq: args(equal_field,...), gets all rows where the equal field(s)
+- getgroupeq: args(field,...), gets all rows where the equal field(s)
   are equal to the input ordered by the field value
-- updeq: args(equal_field,...), updates all rows where the equal fields(s)
+- updeq: args(field,...), updates all rows where the equal fields(s)
   are equal to the input
-- deleq: args(equal_field,...), deletes all rows where the equal fields(s)
+- deleq: args(field,...), deletes all rows where the equal fields(s)
   are equal to the input
 
-equal_field by default has a condition of eq, but it may be explicitly
-specified by column_name|cond. cond may be one of:
+field by default has a condition of eq, but it may be explicitly specified by
+column_name|cond. cond may be one of:
 
 - eq: column value equals the input
 - neq: column value not equal to the input
