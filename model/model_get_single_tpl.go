@@ -1,7 +1,7 @@
 package model
 
 const templateGetOneEq = `
-func (t *{{.Prefix}}ModelTable) Get{{.ModelIdent}}{{.SQLCond.IdentNames}}(ctx context.Context, d db.SQLExecutor, {{.SQLCond.IdentParams}}) (*{{.ModelIdent}}, error) {
+func (t *{{.Prefix}}ModelTable) Get{{.ModelIdent}}{{.SQLCond.IdentNames}}(ctx context.Context, d sqldb.Executor, {{.SQLCond.IdentParams}}) (*{{.ModelIdent}}, error) {
 	{{- if .SQLCond.ArrIdentArgs }}
 	paramCount := {{.SQLCond.ParamCount}}
 	args := make([]interface{}, 0, paramCount{{with .SQLCond.ArrIdentArgsLen}}+{{.}}{{end}})

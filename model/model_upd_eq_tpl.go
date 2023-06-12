@@ -1,7 +1,7 @@
 package model
 
 const templateUpdEq = `
-func (t *{{.Prefix}}ModelTable) Upd{{.ModelIdent}}{{.SQLCond.IdentNames}}(ctx context.Context, d db.SQLExecutor, m *{{.ModelIdent}}, {{.SQLCond.IdentParams}}) error {
+func (t *{{.Prefix}}ModelTable) Upd{{.ModelIdent}}{{.SQLCond.IdentNames}}(ctx context.Context, d sqldb.Executor, m *{{.ModelIdent}}, {{.SQLCond.IdentParams}}) error {
 	{{- if .SQLCond.ArrIdentArgs }}
 	paramCount := {{.SQLCond.ParamCount}}
 	args := make([]interface{}, 0, paramCount{{with .SQLCond.ArrIdentArgsLen}}+{{.}}{{end}})

@@ -105,7 +105,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"xorkevin.dev/governor/service/db"
+
+	"xorkevin.dev/forge/model/sqldb"
 )
 
 type (
@@ -114,7 +115,7 @@ type (
 	}
 )
 
-func (t *userModelTable) Setup(ctx context.Context, d db.SQLExecutor) error {
+func (t *userModelTable) Setup(ctx context.Context, d sqldb.Executor) error {
 	_, err := d.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS "+t.TableName+" (userid VARCHAR(31) PRIMARY KEY, username VARCHAR(255) NOT NULL UNIQUE, first_name VARCHAR(255) NOT NULL);")
 	if err != nil {
 		return err
@@ -126,7 +127,7 @@ func (t *userModelTable) Setup(ctx context.Context, d db.SQLExecutor) error {
 	return nil
 }
 
-func (t *userModelTable) Insert(ctx context.Context, d db.SQLExecutor, m *Model) error {
+func (t *userModelTable) Insert(ctx context.Context, d sqldb.Executor, m *Model) error {
 	_, err := d.ExecContext(ctx, "INSERT INTO "+t.TableName+" (userid, username, first_name) VALUES ($1, $2, $3);", m.Userid, m.Username, m.FirstName)
 	if err != nil {
 		return err
@@ -134,7 +135,7 @@ func (t *userModelTable) Insert(ctx context.Context, d db.SQLExecutor, m *Model)
 	return nil
 }
 
-func (t *userModelTable) InsertBulk(ctx context.Context, d db.SQLExecutor, models []*Model, allowConflict bool) error {
+func (t *userModelTable) InsertBulk(ctx context.Context, d sqldb.Executor, models []*Model, allowConflict bool) error {
 	conflictSQL := ""
 	if allowConflict {
 		conflictSQL = " ON CONFLICT DO NOTHING"
@@ -153,7 +154,7 @@ func (t *userModelTable) InsertBulk(ctx context.Context, d db.SQLExecutor, model
 	return nil
 }
 
-func (t *userModelTable) GetInfoOrdUserid(ctx context.Context, d db.SQLExecutor, orderasc bool, limit, offset int) (_ []Info, retErr error) {
+func (t *userModelTable) GetInfoOrdUserid(ctx context.Context, d sqldb.Executor, orderasc bool, limit, offset int) (_ []Info, retErr error) {
 	order := "DESC"
 	if orderasc {
 		order = "ASC"
@@ -181,7 +182,7 @@ func (t *userModelTable) GetInfoOrdUserid(ctx context.Context, d db.SQLExecutor,
 	return res, nil
 }
 
-func (t *userModelTable) GetInfoHasUseridOrdUserid(ctx context.Context, d db.SQLExecutor, userids []string, orderasc bool, limit, offset int) (_ []Info, retErr error) {
+func (t *userModelTable) GetInfoHasUseridOrdUserid(ctx context.Context, d sqldb.Executor, userids []string, orderasc bool, limit, offset int) (_ []Info, retErr error) {
 	paramCount := 2
 	args := make([]interface{}, 0, paramCount+len(userids))
 	args = append(args, limit, offset)
@@ -222,7 +223,7 @@ func (t *userModelTable) GetInfoHasUseridOrdUserid(ctx context.Context, d db.SQL
 	return res, nil
 }
 
-func (t *userModelTable) GetInfoLikeUsernameOrdUsername(ctx context.Context, d db.SQLExecutor, usernamePrefix string, orderasc bool, limit, offset int) (_ []Info, retErr error) {
+func (t *userModelTable) GetInfoLikeUsernameOrdUsername(ctx context.Context, d sqldb.Executor, usernamePrefix string, orderasc bool, limit, offset int) (_ []Info, retErr error) {
 	order := "DESC"
 	if orderasc {
 		order = "ASC"
@@ -250,7 +251,7 @@ func (t *userModelTable) GetInfoLikeUsernameOrdUsername(ctx context.Context, d d
 	return res, nil
 }
 
-func (t *userModelTable) GetModelEqUserid(ctx context.Context, d db.SQLExecutor, userid string) (*Model, error) {
+func (t *userModelTable) GetModelEqUserid(ctx context.Context, d sqldb.Executor, userid string) (*Model, error) {
 	m := &Model{}
 	if err := d.QueryRowContext(ctx, "SELECT userid, username, first_name FROM "+t.TableName+" WHERE userid = $1;", userid).Scan(&m.Userid, &m.Username, &m.FirstName); err != nil {
 		return nil, err
@@ -258,12 +259,12 @@ func (t *userModelTable) GetModelEqUserid(ctx context.Context, d db.SQLExecutor,
 	return m, nil
 }
 
-func (t *userModelTable) DelEqUserid(ctx context.Context, d db.SQLExecutor, userid string) error {
+func (t *userModelTable) DelEqUserid(ctx context.Context, d sqldb.Executor, userid string) error {
 	_, err := d.ExecContext(ctx, "DELETE FROM "+t.TableName+" WHERE userid = $1;", userid)
 	return err
 }
 
-func (t *userModelTable) GetModelEqUsername(ctx context.Context, d db.SQLExecutor, username string) (*Model, error) {
+func (t *userModelTable) GetModelEqUsername(ctx context.Context, d sqldb.Executor, username string) (*Model, error) {
 	m := &Model{}
 	if err := d.QueryRowContext(ctx, "SELECT userid, username, first_name FROM "+t.TableName+" WHERE username = $1;", username).Scan(&m.Userid, &m.Username, &m.FirstName); err != nil {
 		return nil, err
@@ -271,7 +272,7 @@ func (t *userModelTable) GetModelEqUsername(ctx context.Context, d db.SQLExecuto
 	return m, nil
 }
 
-func (t *userModelTable) UpduserPropsEqUserid(ctx context.Context, d db.SQLExecutor, m *userProps, userid string) error {
+func (t *userModelTable) UpduserPropsEqUserid(ctx context.Context, d sqldb.Executor, m *userProps, userid string) error {
 	_, err := d.ExecContext(ctx, "UPDATE "+t.TableName+" SET (username, first_name) = ROW($1, $2) WHERE userid = $3;", m.Username, m.FirstName, userid)
 	if err != nil {
 		return err
@@ -285,7 +286,7 @@ type (
 	}
 )
 
-func (t *smModelTable) Setup(ctx context.Context, d db.SQLExecutor) error {
+func (t *smModelTable) Setup(ctx context.Context, d sqldb.Executor) error {
 	_, err := d.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS "+t.TableName+" (userid VARCHAR(31) PRIMARY KEY, username VARCHAR(255), first_name VARCHAR(255), last_name VARCHAR(255), email VARCHAR(255));")
 	if err != nil {
 		return err
@@ -293,7 +294,7 @@ func (t *smModelTable) Setup(ctx context.Context, d db.SQLExecutor) error {
 	return nil
 }
 
-func (t *smModelTable) Insert(ctx context.Context, d db.SQLExecutor, m *SM) error {
+func (t *smModelTable) Insert(ctx context.Context, d sqldb.Executor, m *SM) error {
 	_, err := d.ExecContext(ctx, "INSERT INTO "+t.TableName+" (userid, username, first_name, last_name, email) VALUES ($1, $2, $3, $4, $5);", m.Userid, m.Username, m.FirstName, m.LastName, m.Email)
 	if err != nil {
 		return err
@@ -301,7 +302,7 @@ func (t *smModelTable) Insert(ctx context.Context, d db.SQLExecutor, m *SM) erro
 	return nil
 }
 
-func (t *smModelTable) InsertBulk(ctx context.Context, d db.SQLExecutor, models []*SM, allowConflict bool) error {
+func (t *smModelTable) InsertBulk(ctx context.Context, d sqldb.Executor, models []*SM, allowConflict bool) error {
 	conflictSQL := ""
 	if allowConflict {
 		conflictSQL = " ON CONFLICT DO NOTHING"
@@ -320,7 +321,7 @@ func (t *smModelTable) InsertBulk(ctx context.Context, d db.SQLExecutor, models 
 	return nil
 }
 
-func (t *smModelTable) GetSMNeqUseridLtUsernameLeqFirstNameGtLastNameGeqEmail(ctx context.Context, d db.SQLExecutor, userid string, username string, firstname string, lastname string, email string) (*SM, error) {
+func (t *smModelTable) GetSMNeqUseridLtUsernameLeqFirstNameGtLastNameGeqEmail(ctx context.Context, d sqldb.Executor, userid string, username string, firstname string, lastname string, email string) (*SM, error) {
 	m := &SM{}
 	if err := d.QueryRowContext(ctx, "SELECT userid, username, first_name, last_name, email FROM "+t.TableName+" WHERE userid <> $1 AND username < $2 AND first_name <= $3 AND last_name > $4 AND email >= $5;", userid, username, firstname, lastname, email).Scan(&m.Userid, &m.Username, &m.FirstName, &m.LastName, &m.Email); err != nil {
 		return nil, err

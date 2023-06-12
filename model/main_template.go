@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"xorkevin.dev/governor/service/db"
+
+	"xorkevin.dev/forge/model/sqldb"
 )
 `

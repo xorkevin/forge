@@ -1,7 +1,7 @@
 package model
 
 const templateGetGroup = `
-func (t *{{.Prefix}}ModelTable) Get{{.ModelIdent}}Ord{{.PrimaryField.Ident}}(ctx context.Context, d db.SQLExecutor, orderasc bool, limit, offset int) (_ []{{.ModelIdent}}, retErr error) {
+func (t *{{.Prefix}}ModelTable) Get{{.ModelIdent}}Ord{{.PrimaryField.Ident}}(ctx context.Context, d sqldb.Executor, orderasc bool, limit, offset int) (_ []{{.ModelIdent}}, retErr error) {
 	order := "DESC"
 	if orderasc {
 		order = "ASC"

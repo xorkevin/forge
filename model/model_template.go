@@ -7,7 +7,7 @@ type (
 	}
 )
 
-func (t *{{.Prefix}}ModelTable) Setup(ctx context.Context, d db.SQLExecutor) error {
+func (t *{{.Prefix}}ModelTable) Setup(ctx context.Context, d sqldb.Executor) error {
 	_, err := d.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS "+t.TableName+" ({{.SQL.Setup}});")
 	if err != nil {
 		return err
@@ -21,7 +21,7 @@ func (t *{{.Prefix}}ModelTable) Setup(ctx context.Context, d db.SQLExecutor) err
 	return nil
 }
 
-func (t *{{.Prefix}}ModelTable) Insert(ctx context.Context, d db.SQLExecutor, m *{{.ModelIdent}}) error {
+func (t *{{.Prefix}}ModelTable) Insert(ctx context.Context, d sqldb.Executor, m *{{.ModelIdent}}) error {
 	_, err := d.ExecContext(ctx, "INSERT INTO "+t.TableName+" ({{.SQL.DBNames}}) VALUES ({{.SQL.Placeholders}});", {{.SQL.Idents}})
 	if err != nil {
 		return err
@@ -29,7 +29,7 @@ func (t *{{.Prefix}}ModelTable) Insert(ctx context.Context, d db.SQLExecutor, m 
 	return nil
 }
 
-func (t *{{.Prefix}}ModelTable) InsertBulk(ctx context.Context, d db.SQLExecutor, models []*{{.ModelIdent}}, allowConflict bool) error {
+func (t *{{.Prefix}}ModelTable) InsertBulk(ctx context.Context, d sqldb.Executor, models []*{{.ModelIdent}}, allowConflict bool) error {
 	conflictSQL := ""
 	if allowConflict {
 		conflictSQL = " ON CONFLICT DO NOTHING"
