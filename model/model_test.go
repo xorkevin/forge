@@ -46,6 +46,11 @@ type (
 		FirstName string ` + "`" + `query:"first_name"` + "`" + `
 	}
 
+	//forge:model:query user
+	usernameProps struct {
+		Username string ` + "`" + `query:"username;updeq,userid"` + "`" + `
+	}
+
 	//forge:modelnope
 	reqOther struct {
 		Prefix string
@@ -273,7 +278,15 @@ func (t *userModelTable) GetModelEqUsername(ctx context.Context, d sqldb.Executo
 }
 
 func (t *userModelTable) UpduserPropsEqUserid(ctx context.Context, d sqldb.Executor, m *userProps, userid string) error {
-	_, err := d.ExecContext(ctx, "UPDATE "+t.TableName+" SET (username, first_name) = ROW($1, $2) WHERE userid = $3;", m.Username, m.FirstName, userid)
+	_, err := d.ExecContext(ctx, "UPDATE "+t.TableName+" SET (username, first_name) = ($1, $2) WHERE userid = $3;", m.Username, m.FirstName, userid)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *userModelTable) UpdusernamePropsEqUserid(ctx context.Context, d sqldb.Executor, m *usernameProps, userid string) error {
+	_, err := d.ExecContext(ctx, "UPDATE "+t.TableName+" SET username = $1 WHERE userid = $2;", m.Username, userid)
 	if err != nil {
 		return err
 	}

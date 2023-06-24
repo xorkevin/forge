@@ -135,6 +135,7 @@ type (
 
 	querySQLStrings struct {
 		DBNames      string
+		NumDBNames   int
 		Idents       string
 		IdentRefs    string
 		Placeholders string
@@ -419,6 +420,7 @@ func (q *queryDef) genQuerySQL() querySQLStrings {
 
 	return querySQLStrings{
 		DBNames:      strings.Join(sqlDBNames, ", "),
+		NumDBNames:   len(sqlDBNames),
 		Idents:       strings.Join(sqlIdents, ", "),
 		IdentRefs:    strings.Join(sqlIdentRefs, ", "),
 		Placeholders: strings.Join(sqlPlaceholders, ", "),

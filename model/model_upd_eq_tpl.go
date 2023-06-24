@@ -19,7 +19,15 @@ func (t *{{.Prefix}}ModelTable) Upd{{.ModelIdent}}{{.SQLCond.IdentNames}}(ctx co
 		placeholders{{.}} = strings.Join(placeholders, ", ")
 	}
 	{{- end }}
-	_, err := d.ExecContext(ctx, "UPDATE "+t.TableName+" SET ({{.SQL.DBNames}}) = ROW({{.SQL.Placeholders}}) WHERE {{.SQLCond.DBCond}};", {{if .SQLCond.ArrIdentArgs}}args...{{else}}{{.SQL.Idents}}, {{.SQLCond.IdentArgs}}{{end}})
+	_, err := d.ExecContext(ctx, "UPDATE "+t.TableName+" SET {{if eq .SQL.NumDBNames 1 -}}
+	{{.SQL.DBNames -}}
+	{{else -}}
+	({{.SQL.DBNames}})
+	{{- end}} = {{if eq .SQL.NumDBNames 1 -}}
+	{{.SQL.Placeholders -}}
+	{{else -}}
+	({{.SQL.Placeholders}})
+	{{- end}} WHERE {{.SQLCond.DBCond}};", {{if .SQLCond.ArrIdentArgs}}args...{{else}}{{.SQL.Idents}}, {{.SQLCond.IdentArgs}}{{end}})
 	if err != nil {
 		return err
 	}
