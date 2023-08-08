@@ -15,7 +15,7 @@ func TestReadDir(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now()
-	var filemode fs.FileMode = 0644
+	var filemode fs.FileMode = 0o644
 
 	for _, tc := range []struct {
 		Name    string
@@ -163,7 +163,7 @@ func TestFindDirectives(t *testing.T) {
 	assert := require.New(t)
 
 	now := time.Now()
-	var filemode fs.FileMode = 0644
+	var filemode fs.FileMode = 0o644
 
 	fsys := fstest.MapFS{
 		"stuff.go": &fstest.MapFile{
@@ -262,7 +262,7 @@ var (
 			Directives: []DirectiveInstance{
 				{
 					Sigil:     "forge:abc",
-					Directive: "forge:abc dir3",
+					Directive: "dir3",
 				},
 			},
 			Kind: ObjKindGroupType,
@@ -272,7 +272,7 @@ var (
 			Directives: []DirectiveInstance{
 				{
 					Sigil:     "forge:abc",
-					Directive: "forge:abc dir1",
+					Directive: "dir1",
 				},
 			},
 			Kind: ObjKindDeclType,
@@ -282,7 +282,7 @@ var (
 			Directives: []DirectiveInstance{
 				{
 					Sigil:     "forge:abc",
-					Directive: "forge:abc",
+					Directive: "",
 				},
 			},
 			Kind: ObjKindDeclType,
@@ -292,11 +292,11 @@ var (
 			Directives: []DirectiveInstance{
 				{
 					Sigil:     "forge:bc",
-					Directive: "forge:bc dir4",
+					Directive: "dir4",
 				},
 				{
 					Sigil:     "forge:abc",
-					Directive: "forge:abc dir5",
+					Directive: "dir5",
 				},
 			},
 			Kind: ObjKindGroupConst,
@@ -306,7 +306,7 @@ var (
 			Directives: []DirectiveInstance{
 				{
 					Sigil:     "forge:bc",
-					Directive: "forge:bc dir9",
+					Directive: "dir9",
 				},
 			},
 			Kind: ObjKindGroupVar,

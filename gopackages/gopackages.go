@@ -135,7 +135,7 @@ func (v *docCommentVisitor) Visit(node ast.Node) ast.Visitor {
 					(len(text) == len(i) || unicode.IsSpace(rune(text[len(i)]))) {
 					v.dirs = append(v.dirs, DirectiveInstance{
 						Sigil:     i,
-						Directive: text,
+						Directive: strings.TrimSpace(strings.TrimPrefix(text, i)),
 					})
 					return nil
 				}

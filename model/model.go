@@ -497,11 +497,10 @@ func parseModelDefinitions(modelObjects []dirObjPair, modelTag string, fset *tok
 	modelDefs := make([]modelDef, 0, len(modelObjects))
 
 	for _, i := range modelObjects {
-		dirargs := strings.Fields(i.Dir.Directive)
-		if len(dirargs) != 2 || dirargs[1] == "" {
+		prefix := i.Dir.Directive
+		if prefix == "" {
 			return nil, kerrors.WithKind(nil, ErrorInvalidFile{}, "Model directive without prefix")
 		}
-		prefix := dirargs[1]
 		if i.Obj.Kind != gopackages.ObjKindDeclType {
 			return nil, kerrors.WithKind(nil, ErrorInvalidFile{}, "Model directive used on non-type declaration")
 		}
@@ -621,11 +620,10 @@ func parseQueryDefinitions(queryObjects []dirObjPair, queryTag string, modelDefs
 	queryDefs := map[string][]queryDef{}
 
 	for _, i := range queryObjects {
-		dirargs := strings.Fields(i.Dir.Directive)
-		if len(dirargs) != 2 || dirargs[1] == "" {
+		prefix := i.Dir.Directive
+		if prefix == "" {
 			return nil, kerrors.WithKind(nil, ErrorInvalidFile{}, "Query directive without prefix")
 		}
-		prefix := dirargs[1]
 		mdef, ok := modelDefs[prefix]
 		if !ok {
 			return nil, kerrors.WithKind(nil, ErrorInvalidFile{}, fmt.Sprintf("Query directive prefix %s without model definition", prefix))
