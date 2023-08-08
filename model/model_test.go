@@ -354,7 +354,7 @@ func (t *smModelTable) GetSMNeqUseridLtUsernameLeqFirstNameGtLastNameGeqEmail(ct
 					ModTime: now,
 				},
 			},
-			Err: ErrorEnv{},
+			Err: ErrEnv,
 		},
 		{
 			Name: "errors on no models",
@@ -366,7 +366,7 @@ func (t *smModelTable) GetSMNeqUseridLtUsernameLeqFirstNameGtLastNameGeqEmail(ct
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidFile{},
+			Err: ErrInvalidFile,
 		},
 		{
 			Name: "errors on model directive on non-typedef",
@@ -383,7 +383,7 @@ const (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidFile{},
+			Err: ErrInvalidFile,
 		},
 		{
 			Name: "errors on model directive without prefix arg",
@@ -402,7 +402,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidFile{},
+			Err: ErrInvalidFile,
 		},
 		{
 			Name: "errors on model tag on multiple fields",
@@ -421,7 +421,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidModel{},
+			Err: ErrInvalidModel,
 		},
 		{
 			Name: "errors on malformed model tag",
@@ -440,7 +440,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidModel{},
+			Err: ErrInvalidModel,
 		},
 		{
 			Name: "errors on invalid model tag value",
@@ -459,7 +459,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidModel{},
+			Err: ErrInvalidModel,
 		},
 		{
 			Name: "errors on no model tags",
@@ -478,7 +478,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidFile{},
+			Err: ErrInvalidFile,
 		},
 		{
 			Name: "errors on model directive on non-struct",
@@ -495,7 +495,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidFile{},
+			Err: ErrInvalidFile,
 		},
 		{
 			Name: "errors on duplicate model field",
@@ -515,7 +515,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidModel{},
+			Err: ErrInvalidModel,
 		},
 		{
 			Name: "errors on invalid model index opt field",
@@ -534,7 +534,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidModel{},
+			Err: ErrInvalidModel,
 		},
 		{
 			Name: "errors on query directive without prefix arg",
@@ -554,7 +554,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidFile{},
+			Err: ErrInvalidFile,
 		},
 		{
 			Name: "errors on query directive without model def",
@@ -574,7 +574,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidFile{},
+			Err: ErrInvalidFile,
 		},
 		{
 			Name: "errors on query directive on non-typedef",
@@ -598,7 +598,7 @@ const (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidFile{},
+			Err: ErrInvalidFile,
 		},
 		{
 			Name: "errors on query directive on non-struct",
@@ -620,7 +620,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidFile{},
+			Err: ErrInvalidFile,
 		},
 		{
 			Name: "errors on query without fields",
@@ -640,7 +640,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidFile{},
+			Err: ErrInvalidFile,
 		},
 		{
 			Name: "errors on query tag on multiple fields",
@@ -661,7 +661,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidModel{},
+			Err: ErrInvalidModel,
 		},
 		{
 			Name: "errors on malformed query tag",
@@ -681,7 +681,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidModel{},
+			Err: ErrInvalidModel,
 		},
 		{
 			Name: "errors on invalid query tag field",
@@ -701,7 +701,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidModel{},
+			Err: ErrInvalidModel,
 		},
 		{
 			Name: "errors on no query fields",
@@ -721,7 +721,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidModel{},
+			Err: ErrInvalidModel,
 		},
 		{
 			Name: "errors on invalid query tag opt",
@@ -741,7 +741,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidModel{},
+			Err: ErrInvalidModel,
 		},
 		{
 			Name: "errors on missing query tag opt args",
@@ -761,7 +761,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidModel{},
+			Err: ErrInvalidModel,
 		},
 		{
 			Name: "errors on too many query tag opt args",
@@ -781,7 +781,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidModel{},
+			Err: ErrInvalidModel,
 		},
 		{
 			Name: "errors on invalid query tag opt cond",
@@ -801,7 +801,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidModel{},
+			Err: ErrInvalidModel,
 		},
 		{
 			Name: "errors on invalid query tag opt arg field",
@@ -821,7 +821,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidModel{},
+			Err: ErrInvalidModel,
 		},
 	} {
 		tc := tc
