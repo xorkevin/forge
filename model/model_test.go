@@ -32,7 +32,7 @@ func TestGenerate(t *testing.T) {
 					Data: []byte(`package somepackage
 
 type (
-	//forge:model user
+	//forge:model user {"setup":"UNIQUE (first_name)"}
 	//forge:model:query user
 	Model struct {
 		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"userid;getoneeq,userid;deleq,userid|eq"` + "`" + `
@@ -121,7 +121,7 @@ type (
 )
 
 func (t *userModelTable) Setup(ctx context.Context, d sqldb.Executor) error {
-	_, err := d.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS "+t.TableName+" (userid VARCHAR(31) PRIMARY KEY, username VARCHAR(255) NOT NULL UNIQUE, first_name VARCHAR(255) NOT NULL);")
+	_, err := d.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS "+t.TableName+" (userid VARCHAR(31) PRIMARY KEY, username VARCHAR(255) NOT NULL UNIQUE, first_name VARCHAR(255) NOT NULL, UNIQUE (first_name));")
 	if err != nil {
 		return err
 	}
