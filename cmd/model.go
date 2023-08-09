@@ -78,6 +78,7 @@ column_name|cond. cond may be one of:
 		DisableAutoGenTag: true,
 	}
 	modelCmd.PersistentFlags().StringVarP(&c.modelFlags.opts.Output, "output", "o", "model_gen.go", "output filename")
+	modelCmd.PersistentFlags().StringVarP(&c.modelFlags.opts.Schema, "schema", "s", "model.json", "model schema")
 	modelCmd.PersistentFlags().StringVar(&c.modelFlags.opts.Include, "include", "", "regex for filenames of files that should be included")
 	modelCmd.PersistentFlags().StringVar(&c.modelFlags.opts.Ignore, "ignore", "", "regex for filenames of files that should be ignored")
 	modelCmd.PersistentFlags().StringVar(&c.modelFlags.opts.ModelDirective, "model-directive", "forge:model", "comment directive of types that are models")

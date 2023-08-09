@@ -72,6 +72,13 @@ type (
 		Setup string `json:"setup"`
 	}
 
+	queryOpts struct{}
+
+	modelConfig struct {
+		Model   modelOpts   `json:"model"`
+		Queries []queryOpts `json:"queries"`
+	}
+
 	modelDef struct {
 		Prefix   string
 		Ident    string
@@ -176,6 +183,7 @@ func (f queryField) String() string {
 type (
 	Opts struct {
 		Output         string
+		Schema         string
 		Include        string
 		Ignore         string
 		ModelDirective string
@@ -212,6 +220,19 @@ func Execute(log klog.Logger, version string, opts Opts) error {
 
 func Generate(ctx context.Context, log klog.Logger, outputfs fs.FS, inputfs fs.FS, version string, opts Opts, env ExecEnv) (retErr error) {
 	l := klog.NewLevelLogger(log)
+
+	var schema map[string]modelConfig
+	if opts.Schema != "" {
+		if f, err := fs.ReadFile(inputfs, opts.Schema); err != nil {
+			if !errors.Is(err, fs.ErrNotExist) {
+				return kerrors.WithKind(err, ErrInvalidFile, fmt.Sprintf("Failed reading schema file: %s", opts.Schema))
+			}
+		} else {
+			if err := json.Unmarshal(f, &schema); err != nil {
+				return kerrors.WithKind(err, ErrInvalidFile, fmt.Sprintf("Invalid schema file: %s", opts.Schema))
+			}
+		}
+	}
 
 	var includePattern, ignorePattern *regexp.Regexp
 	if opts.Include != "" {
@@ -259,7 +280,7 @@ func Generate(ctx context.Context, log klog.Logger, outputfs fs.FS, inputfs fs.F
 		return kerrors.WithKind(nil, ErrInvalidFile, "No models found")
 	}
 
-	modelDefs, err := parseModelDefinitions(modelObjects, opts.ModelTag, fset)
+	modelDefs, err := parseModelDefinitions(modelObjects, opts.ModelTag, fset, schema)
 	if err != nil {
 		return err
 	}
@@ -508,21 +529,15 @@ func (q *queryField) genQueryCondSQL(offset int) queryCondSQLStrings {
 	}
 }
 
-func parseModelDefinitions(modelObjects []dirObjPair, modelTag string, fset *token.FileSet) ([]modelDef, error) {
+func parseModelDefinitions(modelObjects []dirObjPair, modelTag string, fset *token.FileSet, schema map[string]modelConfig) ([]modelDef, error) {
 	modelDefs := make([]modelDef, 0, len(modelObjects))
 
 	for _, i := range modelObjects {
-		prefix, rest, _ := strings.Cut(i.Dir.Directive, " ")
+		prefix := i.Dir.Directive
 		if prefix == "" {
 			return nil, kerrors.WithKind(nil, ErrInvalidFile, "Model directive without prefix")
 		}
-		var opts modelOpts
-		rest = strings.TrimSpace(rest)
-		if rest != "" {
-			if err := json.Unmarshal([]byte(rest), &opts); err != nil {
-				return nil, kerrors.WithKind(nil, ErrInvalidFile, "Model directive without prefix")
-			}
-		}
+		opts := schema[prefix]
 		if i.Obj.Kind != gopackages.ObjKindDeclType {
 			return nil, kerrors.WithKind(nil, ErrInvalidFile, "Model directive used on non-type declaration")
 		}
@@ -554,7 +569,7 @@ func parseModelDefinitions(modelObjects []dirObjPair, modelTag string, fset *tok
 			Ident:    structName,
 			Fields:   modelFields,
 			Indicies: indicies,
-			opts:     opts,
+			opts:     opts.Model,
 			fieldMap: fieldMap,
 		})
 	}

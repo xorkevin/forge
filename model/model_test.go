@@ -28,11 +28,24 @@ func TestGenerate(t *testing.T) {
 		{
 			Name: "parses directives from files",
 			Fsys: fstest.MapFS{
+				"model.json": &fstest.MapFile{
+					Data: []byte(`
+{
+  "user": {
+    "model": {
+      "setup": "UNIQUE (first_name)"
+    }
+  }
+}
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
 				"stuff.go": &fstest.MapFile{
 					Data: []byte(`package somepackage
 
 type (
-	//forge:model user {"setup":"UNIQUE (first_name)"}
+	//forge:model user
 	//forge:model:query user
 	Model struct {
 		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"userid;getoneeq,userid;deleq,userid|eq"` + "`" + `
@@ -835,6 +848,7 @@ type (
 			}
 			err := Generate(context.Background(), klog.Discard{}, outputfs, tc.Fsys, "dev", Opts{
 				Output:         "model_gen.go",
+				Schema:         "model.json",
 				Include:        "stuff",
 				Ignore:         `_again\.go$`,
 				ModelDirective: "forge:model",
@@ -878,6 +892,7 @@ type (
 			}
 			err := Generate(context.Background(), klog.Discard{}, outputfs, fsys, "dev", Opts{
 				Output:         "model_gen.go",
+				Schema:         "model.json",
 				Include:        `\y`,
 				Ignore:         `_again\.go$`,
 				ModelDirective: "forge:model",
@@ -900,6 +915,7 @@ type (
 			}
 			err := Generate(context.Background(), klog.Discard{}, outputfs, fsys, "dev", Opts{
 				Output:         "model_gen.go",
+				Schema:         "model.json",
 				Include:        "stuff",
 				Ignore:         `\y`,
 				ModelDirective: "forge:model",
@@ -938,6 +954,7 @@ type (
 		}
 		err := Generate(context.Background(), klog.Discard{}, outputfs, fsys, "dev", Opts{
 			Output:         "model_gen.go",
+			Schema:         "model.json",
 			Include:        "",
 			Ignore:         "",
 			ModelDirective: "forge:model",
