@@ -33,7 +33,18 @@ func TestGenerate(t *testing.T) {
 {
   "user": {
     "model": {
-      "setup": "UNIQUE (first_name)"
+      "setup": "UNIQUE (first_name)",
+      "constraints": [
+        {
+          "kind": "UNIQUE",
+          "columns": ["username", "first_name"]
+        }
+      ],
+      "indicies": [
+        {
+          "columns": ["first_name", "username"]
+        }
+      ]
     }
   }
 }
@@ -49,7 +60,7 @@ type (
 	//forge:model:query user
 	Model struct {
 		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"userid;getoneeq,userid;deleq,userid|eq"` + "`" + `
-		Username string ` + "`" + `model:"username,VARCHAR(255) NOT NULL UNIQUE;index,first_name" query:"username;getoneeq,username"` + "`" + `
+		Username string ` + "`" + `model:"username,VARCHAR(255) NOT NULL UNIQUE" query:"username;getoneeq,username"` + "`" + `
 		FirstName string ` + "`" + `model:"first_name,VARCHAR(255) NOT NULL" query:"first_name"` + "`" + `
 	}
 
@@ -134,7 +145,7 @@ type (
 )
 
 func (t *userModelTable) Setup(ctx context.Context, d sqldb.Executor) error {
-	_, err := d.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS "+t.TableName+" (userid VARCHAR(31) PRIMARY KEY, username VARCHAR(255) NOT NULL UNIQUE, first_name VARCHAR(255) NOT NULL, UNIQUE (first_name));")
+	_, err := d.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS "+t.TableName+" (userid VARCHAR(31) PRIMARY KEY, username VARCHAR(255) NOT NULL UNIQUE, first_name VARCHAR(255) NOT NULL, UNIQUE (username, first_name), UNIQUE (first_name));")
 	if err != nil {
 		return err
 	}
@@ -456,25 +467,6 @@ type (
 			Err: ErrInvalidModel,
 		},
 		{
-			Name: "errors on invalid model tag value",
-			Fsys: fstest.MapFS{
-				"stuff.go": &fstest.MapFile{
-					Data: []byte(`package somepackage
-
-type (
-	//forge:model user
-	Model struct {
-		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY;bogus"` + "`" + `
-	}
-)
-`),
-					Mode:    filemode,
-					ModTime: now,
-				},
-			},
-			Err: ErrInvalidModel,
-		},
-		{
 			Name: "errors on no model tags",
 			Fsys: fstest.MapFS{
 				"stuff.go": &fstest.MapFile{
@@ -533,13 +525,177 @@ type (
 		{
 			Name: "errors on invalid model index opt field",
 			Fsys: fstest.MapFS{
+				"model.json": &fstest.MapFile{
+					Data: []byte(`
+{
+  "user": {
+    "model": {
+      "indicies": [
+        {
+          "columns": ["bogus", "userid"]
+        }
+      ]
+    }
+  }
+}
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
 				"stuff.go": &fstest.MapFile{
 					Data: []byte(`package somepackage
 
 type (
 	//forge:model user
 	Model struct {
-		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY;index,bogus"` + "`" + `
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrInvalidModel,
+		},
+		{
+			Name: "errors on missing model index opt columns",
+			Fsys: fstest.MapFS{
+				"model.json": &fstest.MapFile{
+					Data: []byte(`
+{
+  "user": {
+    "model": {
+      "indicies": [
+        {
+          "columns": []
+        }
+      ]
+    }
+  }
+}
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrInvalidModel,
+		},
+		{
+			Name: "errors on missing model constraint opt kind",
+			Fsys: fstest.MapFS{
+				"model.json": &fstest.MapFile{
+					Data: []byte(`
+{
+  "user": {
+    "model": {
+      "constraints": [
+        {
+          "kind": "",
+          "columns": ["userid"]
+        }
+      ]
+    }
+  }
+}
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrInvalidModel,
+		},
+		{
+			Name: "errors on missing model constraint opt columns",
+			Fsys: fstest.MapFS{
+				"model.json": &fstest.MapFile{
+					Data: []byte(`
+{
+  "user": {
+    "model": {
+      "constraints": [
+        {
+          "kind": "UNIQUE",
+          "columns": []
+        }
+      ]
+    }
+  }
+}
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrInvalidModel,
+		},
+		{
+			Name: "errors on invalid model constraint opt field",
+			Fsys: fstest.MapFS{
+				"model.json": &fstest.MapFile{
+					Data: []byte(`
+{
+  "user": {
+    "model": {
+      "constraints": [
+        {
+          "kind": "UNIQUE",
+          "columns": ["bogus", "userid"]
+        }
+      ]
+    }
+  }
+}
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
 	}
 )
 `),

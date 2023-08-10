@@ -68,8 +68,19 @@ type (
 		Tags   string
 	}
 
+	modelIndexOpts struct {
+		Columns []string `json:"columns"`
+	}
+
+	modelConstraintOpts struct {
+		Kind    string   `json:"kind"`
+		Columns []string `json:"columns"`
+	}
+
 	modelOpts struct {
-		Setup string `json:"setup"`
+		Setup       string                `json:"setup"`
+		Constraints []modelConstraintOpts `json:"constraints"`
+		Indicies    []modelIndexOpts      `json:"indicies"`
 	}
 
 	queryOpts struct{}
@@ -80,12 +91,13 @@ type (
 	}
 
 	modelDef struct {
-		Prefix   string
-		Ident    string
-		Fields   []modelField
-		Indicies [][]modelField
-		opts     modelOpts
-		fieldMap map[string]modelField
+		Prefix      string
+		Ident       string
+		Fields      []modelField
+		Constraints []modelConstraint
+		Indicies    [][]modelField
+		opts        modelOpts
+		fieldMap    map[string]modelField
 	}
 
 	modelField struct {
@@ -94,6 +106,11 @@ type (
 		DBName string
 		DBType string
 		Num    int
+	}
+
+	modelConstraint struct {
+		Kind    string
+		Columns []modelField
 	}
 
 	queryDef struct {
@@ -411,6 +428,13 @@ func (m *modelDef) genModelSQL() modelSQLStrings {
 		sqlPlaceholderCount = append(sqlPlaceholderCount, fmt.Sprintf("n+%d", placeholderStart+n))
 		sqlIdents = append(sqlIdents, fmt.Sprintf("m.%s", i.Ident))
 	}
+	for _, i := range m.Constraints {
+		fields := make([]string, 0, len(i.Columns))
+		for _, j := range i.Columns {
+			fields = append(fields, j.DBName)
+		}
+		sqlDefs = append(sqlDefs, fmt.Sprintf("%s (%s)", i.Kind, strings.Join(fields, ", ")))
+	}
 	if m.opts.Setup != "" {
 		sqlDefs = append(sqlDefs, m.opts.Setup)
 	}
@@ -560,36 +584,70 @@ func parseModelDefinitions(modelObjects []dirObjPair, modelTag string, fset *tok
 		if len(astFields) == 0 {
 			return nil, kerrors.WithKind(nil, ErrInvalidFile, "No model fields found on struct")
 		}
-		modelFields, fieldMap, indicies, err := parseModelFields(astFields)
+		modelFields, fieldMap, err := parseModelFields(astFields)
 		if err != nil {
 			return nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse model fields for struct %s", structName))
 		}
+		constraints := make([]modelConstraint, 0, len(opts.Model.Constraints))
+		for _, i := range opts.Model.Constraints {
+			if i.Kind == "" {
+				return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Missing constraint kind for struct %s", structName))
+			}
+			if len(i.Columns) == 0 {
+				return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("No columns for constraint of struct %s", structName))
+			}
+			fields := make([]modelField, 0, len(i.Columns))
+			for _, j := range i.Columns {
+				f, ok := fieldMap[j]
+				if !ok {
+					return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Missing field %s for constraint of struct %s", j, structName))
+				}
+				fields = append(fields, f)
+			}
+			constraints = append(constraints, modelConstraint{
+				Kind:    i.Kind,
+				Columns: fields,
+			})
+		}
+		indicies := make([][]modelField, 0, len(opts.Model.Indicies))
+		for _, i := range opts.Model.Indicies {
+			if len(i.Columns) == 0 {
+				return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("No columns for index of struct %s", structName))
+			}
+			fields := make([]modelField, 0, len(i.Columns))
+			for _, j := range i.Columns {
+				f, ok := fieldMap[j]
+				if !ok {
+					return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Missing field %s for index of struct %s", j, structName))
+				}
+				fields = append(fields, f)
+			}
+			indicies = append(indicies, fields)
+		}
 		modelDefs = append(modelDefs, modelDef{
-			Prefix:   prefix,
-			Ident:    structName,
-			Fields:   modelFields,
-			Indicies: indicies,
-			opts:     opts.Model,
-			fieldMap: fieldMap,
+			Prefix:      prefix,
+			Ident:       structName,
+			Fields:      modelFields,
+			Constraints: constraints,
+			Indicies:    indicies,
+			opts:        opts.Model,
+			fieldMap:    fieldMap,
 		})
 	}
 
 	return modelDefs, nil
 }
 
-func parseModelFields(astfields []astField) ([]modelField, map[string]modelField, [][]modelField, error) {
+func parseModelFields(astfields []astField) ([]modelField, map[string]modelField, error) {
 	fields := make([]modelField, 0, len(astfields))
 	seenFields := map[string]modelField{}
-	var tagIndicies [][]string
-
 	for n, i := range astfields {
-		dbstr, rest, _ := strings.Cut(i.Tags, ";")
-		dbName, dbType, ok := strings.Cut(dbstr, ",")
+		dbName, dbType, ok := strings.Cut(i.Tags, ",")
 		if !ok || dbName == "" || dbType == "" {
-			return nil, nil, nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Model field tag must be dbname,dbtype[;opt[,fields ...][; ...]] on field %s", i.Ident))
+			return nil, nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Model field tag must be dbname,dbtype on field %s", i.Ident))
 		}
 		if dup, ok := seenFields[dbName]; ok {
-			return nil, nil, nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Duplicate field %s on %s and %s", dbName, i.Ident, dup.Ident))
+			return nil, nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Duplicate field %s on %s and %s", dbName, i.Ident, dup.Ident))
 		}
 		f := modelField{
 			Ident:  i.Ident,
@@ -600,58 +658,8 @@ func parseModelFields(astfields []astField) ([]modelField, map[string]modelField
 		}
 		seenFields[dbName] = f
 		fields = append(fields, f)
-		var opts []string
-		if rest != "" {
-			opts = strings.Split(rest, ";")
-		}
-		for _, i := range opts {
-			opt := strings.Split(i, ",")
-			optflag, err := parseModelOpt(opt[0])
-			if err != nil {
-				return nil, nil, nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse model opt for field %s", f.Ident))
-			}
-			switch optflag {
-			case modelOptIndex:
-				args := make([]string, len(opt))
-				copy(args, opt[1:])
-				args[len(args)-1] = dbName
-				tagIndicies = append(tagIndicies, args)
-			}
-		}
 	}
-
-	indicies := [][]modelField{}
-	for _, i := range tagIndicies {
-		k := make([]modelField, 0, len(i))
-		for _, j := range i {
-			f, ok := seenFields[j]
-			if !ok {
-				return nil, nil, nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("No field %s for index", j))
-			}
-			k = append(k, f)
-		}
-		indicies = append(indicies, k)
-	}
-
-	return fields, seenFields, indicies, nil
-}
-
-type (
-	modelOpt int
-)
-
-const (
-	modelOptUnknown modelOpt = iota
-	modelOptIndex
-)
-
-func parseModelOpt(opt string) (modelOpt, error) {
-	switch opt {
-	case "index":
-		return modelOptIndex, nil
-	default:
-		return modelOptUnknown, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Illegal opt %s", opt))
-	}
+	return fields, seenFields, nil
 }
 
 func parseQueryDefinitions(queryObjects []dirObjPair, queryTag string, modelDefs map[string]modelDef, fset *token.FileSet) (map[string][]queryDef, error) {
