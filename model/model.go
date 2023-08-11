@@ -83,11 +83,25 @@ type (
 		Indicies    []modelIndexOpts      `json:"indicies"`
 	}
 
-	queryOpts struct{}
+	queryCondOpt struct {
+		Col  string `json:"col"`
+		Cond string `json:"cond"`
+	}
+
+	queryOrderOpt struct {
+		Col string `json:"col"`
+		Dir bool   `json:"dir"`
+	}
+
+	queryOpts struct {
+		Kind       string          `json:"kind"`
+		Conditions []queryCondOpt  `json:"conditions"`
+		Order      []queryOrderOpt `json:"order"`
+	}
 
 	modelConfig struct {
-		Model   modelOpts   `json:"model"`
-		Queries []queryOpts `json:"queries"`
+		Model   modelOpts              `json:"model"`
+		Queries map[string][]queryOpts `json:"queries"`
 	}
 
 	modelDef struct {
@@ -113,10 +127,10 @@ type (
 		Columns []modelField
 	}
 
-	queryDef struct {
-		Ident       string
-		Fields      []queryField
-		QueryFields []queryField
+	queryGroupDef struct {
+		Ident   string
+		Fields  []queryField
+		Queries []queryDef
 	}
 
 	queryField struct {
@@ -124,13 +138,22 @@ type (
 		GoType string
 		DBName string
 		Num    int
-		Mode   queryOpt
-		Cond   []condField
 	}
 
-	condField struct {
+	queryDef struct {
+		Kind  queryKind
+		Conds []queryCondField
+		Order []queryOrderField
+	}
+
+	queryCondField struct {
 		Kind  condType
 		Field modelField
+	}
+
+	queryOrderField struct {
+		Field modelField
+		Dir   string
 	}
 
 	mainTemplateData struct {
@@ -162,11 +185,10 @@ type (
 	}
 
 	queryTemplateData struct {
-		Prefix       string
-		ModelIdent   string
-		PrimaryField queryField
-		SQL          querySQLStrings
-		SQLCond      queryCondSQLStrings
+		Prefix     string
+		ModelIdent string
+		SQL        querySQLStrings
+		SQLCond    queryCondSQLStrings
 	}
 
 	querySQLStrings struct {
@@ -305,7 +327,7 @@ func Generate(ctx context.Context, log klog.Logger, outputfs fs.FS, inputfs fs.F
 	for _, i := range modelDefs {
 		modelDefMap[i.Prefix] = i
 	}
-	queryDefs, err := parseQueryDefinitions(queryObjects, opts.QueryTag, modelDefMap, fset)
+	queryGroupDefs, err := parseQueryDefinitions(queryObjects, opts.QueryTag, modelDefMap, fset, schema)
 	if err != nil {
 		return err
 	}
@@ -318,24 +340,24 @@ func Generate(ctx context.Context, log klog.Logger, outputfs fs.FS, inputfs fs.F
 	if err != nil {
 		return kerrors.WithMsg(err, "Failed to parse template templateModel")
 	}
-	tplQuery := map[queryOpt]*template.Template{}
-	tplQuery[queryOptGetOneEq], err = template.New("getoneeq").Parse(templateGetOneEq)
+	tplQuery := map[queryKind]*template.Template{}
+	tplQuery[queryKindGetOneEq], err = template.New("getoneeq").Parse(templateGetOneEq)
 	if err != nil {
 		return kerrors.WithMsg(err, "Failed to parse template templateGetOneEq")
 	}
-	tplQuery[queryOptGetGroup], err = template.New("getgroup").Parse(templateGetGroup)
+	tplQuery[queryKindGetGroup], err = template.New("getgroup").Parse(templateGetGroup)
 	if err != nil {
 		return kerrors.WithMsg(err, "Failed to parse template templateGetGroup")
 	}
-	tplQuery[queryOptGetGroupEq], err = template.New("getgroupeq").Parse(templateGetGroupEq)
+	tplQuery[queryKindGetGroupEq], err = template.New("getgroupeq").Parse(templateGetGroupEq)
 	if err != nil {
 		return kerrors.WithMsg(err, "Failed to parse template templateGetGroupEq")
 	}
-	tplQuery[queryOptUpdEq], err = template.New("updeq").Parse(templateUpdEq)
+	tplQuery[queryKindUpdEq], err = template.New("updeq").Parse(templateUpdEq)
 	if err != nil {
 		return kerrors.WithMsg(err, "Failed to parse template templateUpdEq")
 	}
-	tplQuery[queryOptDelEq], err = template.New("deleq").Parse(templateDelEq)
+	tplQuery[queryKindDelEq], err = template.New("deleq").Parse(templateDelEq)
 	if err != nil {
 		return kerrors.WithMsg(err, "Failed to parse template templateDelEq")
 	}
@@ -372,30 +394,29 @@ func Generate(ctx context.Context, log klog.Logger, outputfs fs.FS, inputfs fs.F
 		if err := tplmodel.Execute(fwriter, tplData); err != nil {
 			return kerrors.WithMsg(err, fmt.Sprintf("Failed to execute model template for struct: %s", i.Ident))
 		}
-		for _, j := range queryDefs[i.Prefix] {
+		for _, j := range queryGroupDefs[i.Prefix] {
 			qctx := klog.CtxWithAttrs(mctx, klog.AString("query", j.Ident))
 			l.Debug(qctx, "Detected query", klog.AAny("fields", j.Fields))
 
 			querySQLStrings := j.genQuerySQL()
 			numFields := len(j.Fields)
-			for _, k := range j.QueryFields {
+			for _, k := range j.Queries {
 				tplData := queryTemplateData{
-					Prefix:       i.Prefix,
-					ModelIdent:   j.Ident,
-					PrimaryField: k,
-					SQL:          querySQLStrings,
+					Prefix:     i.Prefix,
+					ModelIdent: j.Ident,
+					SQL:        querySQLStrings,
 				}
-				switch k.Mode {
-				case queryOptGetOneEq:
+				switch k.Kind {
+				case queryKindGetOneEq:
 					tplData.SQLCond = k.genQueryCondSQL(0)
-				case queryOptGetGroupEq:
+				case queryKindGetGroupEq:
 					tplData.SQLCond = k.genQueryCondSQL(2)
-				case queryOptUpdEq:
+				case queryKindUpdEq:
 					tplData.SQLCond = k.genQueryCondSQL(numFields)
-				case queryOptDelEq:
+				case queryKindDelEq:
 					tplData.SQLCond = k.genQueryCondSQL(0)
 				}
-				if err := tplQuery[k.Mode].Execute(fwriter, tplData); err != nil {
+				if err := tplQuery[k.Kind].Execute(fwriter, tplData); err != nil {
 					return kerrors.WithMsg(err, fmt.Sprintf("Failed to execute template for field %s on struct %s", tplData.PrimaryField.Ident, tplData.ModelIdent))
 				}
 			}
@@ -463,7 +484,7 @@ func (m *modelDef) genModelSQL() modelSQLStrings {
 	}
 }
 
-func (q *queryDef) genQuerySQL() querySQLStrings {
+func (q *queryGroupDef) genQuerySQL() querySQLStrings {
 	colNum := len(q.Fields)
 	sqlDBNames := make([]string, 0, colNum)
 	sqlIdents := make([]string, 0, colNum)
@@ -662,8 +683,8 @@ func parseModelFields(astfields []astField) ([]modelField, map[string]modelField
 	return fields, seenFields, nil
 }
 
-func parseQueryDefinitions(queryObjects []dirObjPair, queryTag string, modelDefs map[string]modelDef, fset *token.FileSet) (map[string][]queryDef, error) {
-	queryDefs := map[string][]queryDef{}
+func parseQueryDefinitions(queryObjects []dirObjPair, queryTag string, modelDefs map[string]modelDef, fset *token.FileSet, schema map[string]modelConfig) (map[string][]queryGroupDef, error) {
+	queryGroupDefs := map[string][]queryGroupDef{}
 
 	for _, i := range queryObjects {
 		prefix := i.Dir.Directive
@@ -696,31 +717,72 @@ func parseQueryDefinitions(queryObjects []dirObjPair, queryTag string, modelDefs
 		if len(astFields) == 0 {
 			return nil, kerrors.WithKind(nil, ErrInvalidFile, "No query fields found on struct")
 		}
-		fields, queries, err := parseQueryFields(astFields, mdef.fieldMap)
+		fields, err := parseQueryFields(astFields, mdef.fieldMap)
 		if err != nil {
 			return nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse query fields for struct %s", structName))
 		}
-		queryDefs[prefix] = append(queryDefs[prefix], queryDef{
-			Ident:       structName,
-			Fields:      fields,
-			QueryFields: queries,
+		opts := schema[prefix].Queries[structName]
+		if len(opts) == 0 {
+			return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Query struct %s does not contain queries", structName))
+		}
+		queries := make([]queryDef, 0, len(opts))
+		for _, j := range opts {
+			kind, err := parseQueryKind(j.Kind)
+			if err != nil {
+				return nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse query kind for struct %s", structName))
+			}
+			def := queryDef{
+				Kind: kind,
+			}
+			switch kind {
+			case queryKindGetOneEq, queryKindGetGroupEq, queryKindUpdEq, queryKindDelEq:
+				{
+					if len(j.Conditions) == 0 {
+						return nil, kerrors.WithKind(err, ErrInvalidModel, fmt.Sprintf("Query missing condition fields for kind %s on struct %s", j.Kind, structName))
+					}
+					k := make([]queryCondField, 0, len(j.Conditions))
+					for _, c := range j.Conditions {
+						field, ok := mdef.fieldMap[c.Col]
+						if !ok {
+							return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Invalid condition field %s for kind %s on struct %s", c.Col, j.Kind, structName))
+						}
+						cond, err := parseCond(c.Cond)
+						if err != nil {
+							return nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse condition for kind %s field %s on struct %s", j.Kind, c.Col, structName))
+						}
+						k = append(k, queryCondField{
+							Kind:  cond,
+							Field: field,
+						})
+					}
+					def.Conds = k
+				}
+			default:
+				if len(j.Conditions) != 0 {
+					return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Query kind %s does not take conditions on struct %s", j.Kind, structName))
+				}
+			}
+			queries = append(queries, def)
+		}
+		queryGroupDefs[prefix] = append(queryGroupDefs[prefix], queryGroupDef{
+			Ident:   structName,
+			Fields:  fields,
+			Queries: queries,
 		})
 	}
 
-	return queryDefs, nil
+	return queryGroupDefs, nil
 }
 
-func parseQueryFields(astfields []astField, fieldMap map[string]modelField) ([]queryField, []queryField, error) {
+func parseQueryFields(astfields []astField, fieldMap map[string]modelField) ([]queryField, error) {
 	var fields []queryField
-	var queryFields []queryField
-
 	for n, i := range astfields {
-		dbName, rest, _ := strings.Cut(i.Tags, ";")
+		dbName := i.Tags
 		if len(dbName) < 1 {
-			return nil, nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Query field opt must be dbname[;flag[,args ...][; ...]] for field %s", i.Ident))
+			return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Query field opt must be dbname[;flag[,args ...][; ...]] for field %s", i.Ident))
 		}
 		if mfield, ok := fieldMap[dbName]; !ok || i.GoType != mfield.GoType {
-			return nil, nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Field %s with type %s does not exist on model", dbName, i.GoType))
+			return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Field %s with type %s does not exist on model", dbName, i.GoType))
 		}
 		f := queryField{
 			Ident:  i.Ident,
@@ -729,82 +791,40 @@ func parseQueryFields(astfields []astField, fieldMap map[string]modelField) ([]q
 			Num:    n + 1,
 		}
 		fields = append(fields, f)
-		if rest != "" {
-			for _, t := range strings.Split(rest, ";") {
-				opt := strings.Split(t, ",")
-				optflag, err := parseQueryOpt(opt[0])
-				if err != nil {
-					return nil, nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse query opt for field %s", f.Ident))
-				}
-				f.Mode = optflag
-				switch optflag {
-				case queryOptGetOneEq, queryOptGetGroupEq, queryOptUpdEq, queryOptDelEq:
-					{
-						if len(opt) < 2 {
-							return nil, nil, kerrors.WithKind(err, ErrInvalidModel, fmt.Sprintf("Query field opt must be dbname;flag,fields,... for opt %s on field %s", opt[0], f.Ident))
-						}
-						args := opt[1:]
-						k := make([]condField, 0, len(args))
-						for _, cond := range args {
-							fieldName, cond, err := parseCondField(cond)
-							if err != nil {
-								return nil, nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse condition field for opt %s on field %s", opt[0], f.Ident))
-							}
-							if field, ok := fieldMap[fieldName]; ok {
-								k = append(k, condField{
-									Kind:  cond,
-									Field: field,
-								})
-							} else {
-								return nil, nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Invalid condition field %s for field %s", fieldName, i.Ident))
-							}
-						}
-						f.Cond = k
-					}
-				default:
-					if len(opt) != 1 {
-						return nil, nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Query field opt must be dbname;flag for opt %s on field %s", opt[0], i.Ident))
-					}
-				}
-				queryFields = append(queryFields, f)
-			}
-		}
 	}
-
-	if len(queryFields) == 0 {
-		return nil, nil, kerrors.WithKind(nil, ErrInvalidModel, "Query does not contain a query field")
+	if len(fields) == 0 {
+		return nil, kerrors.WithKind(nil, ErrInvalidModel, "Query does not contain a selected field")
 	}
-
-	return fields, queryFields, nil
+	return fields, nil
 }
 
 type (
-	queryOpt int
+	queryKind int
 )
 
 const (
-	queryOptUnknown queryOpt = iota
-	queryOptGetOneEq
-	queryOptGetGroup
-	queryOptGetGroupEq
-	queryOptUpdEq
-	queryOptDelEq
+	queryKindUnknown queryKind = iota
+	queryKindGetOneEq
+	queryKindGetGroup
+	queryKindGetGroupEq
+	queryKindUpdEq
+	queryKindDelEq
 )
 
-func parseQueryOpt(opt string) (queryOpt, error) {
-	switch opt {
+func parseQueryKind(kind string) (queryKind, error) {
+	switch kind {
 	case "getoneeq":
-		return queryOptGetOneEq, nil
+		return queryKindGetOneEq, nil
 	case "getgroup":
-		return queryOptGetGroup, nil
+		return queryKindGetGroup, nil
 	case "getgroupeq":
-		return queryOptGetGroupEq, nil
+		return queryKindGetGroupEq, nil
 	case "updeq":
-		return queryOptUpdEq, nil
+		return queryKindUpdEq, nil
 	case "deleq":
-		return queryOptDelEq, nil
+		return queryKindDelEq, nil
 	default:
-		return queryOptUnknown, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Illegal opt %s", opt))
+		return queryKindUnknown, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Illegal query kind %s", kind))
 	}
 }
 
@@ -824,21 +844,9 @@ const (
 	condLike
 )
 
-func parseCondField(field string) (string, condType, error) {
-	fieldName, condName, _ := strings.Cut(field, "|")
-	if condName != "" {
-		cond, err := parseCond(condName)
-		if err != nil {
-			return "", condUnknown, err
-		}
-		return fieldName, cond, nil
-	}
-	return fieldName, condEq, nil
-}
-
 func parseCond(cond string) (condType, error) {
 	switch cond {
-	case "eq":
+	case "", "eq":
 		return condEq, nil
 	case "neq":
 		return condNeq, nil
