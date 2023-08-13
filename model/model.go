@@ -90,11 +90,12 @@ type (
 
 	queryOrderOpt struct {
 		Col string `json:"col"`
-		Dir bool   `json:"dir"`
+		Dir string `json:"dir"`
 	}
 
 	queryOpts struct {
 		Kind       string          `json:"kind"`
+		Name       string          `json:"name"`
 		Conditions []queryCondOpt  `json:"conditions"`
 		Order      []queryOrderOpt `json:"order"`
 	}
@@ -142,6 +143,7 @@ type (
 
 	queryDef struct {
 		Kind  queryKind
+		Name  string
 		Conds []queryCondField
 		Order []queryOrderField
 	}
@@ -187,8 +189,10 @@ type (
 	queryTemplateData struct {
 		Prefix     string
 		ModelIdent string
+		Name       string
 		SQL        querySQLStrings
 		SQLCond    queryCondSQLStrings
+		SQLOrder   queryOrderSQLStrings
 	}
 
 	querySQLStrings struct {
@@ -201,13 +205,16 @@ type (
 	}
 
 	queryCondSQLStrings struct {
-		IdentNames      string
 		IdentParams     string
 		DBCond          string
 		IdentArgs       string
 		ArrIdentArgs    []string
 		ArrIdentArgsLen string
 		ParamCount      int
+	}
+
+	queryOrderSQLStrings struct {
+		DBOrder string
 	}
 )
 
@@ -404,20 +411,24 @@ func Generate(ctx context.Context, log klog.Logger, outputfs fs.FS, inputfs fs.F
 				tplData := queryTemplateData{
 					Prefix:     i.Prefix,
 					ModelIdent: j.Ident,
+					Name:       k.Name,
 					SQL:        querySQLStrings,
 				}
 				switch k.Kind {
 				case queryKindGetOneEq:
 					tplData.SQLCond = k.genQueryCondSQL(0)
+				case queryKindGetGroup:
+					tplData.SQLOrder = k.genQueryOrderSQL()
 				case queryKindGetGroupEq:
 					tplData.SQLCond = k.genQueryCondSQL(2)
+					tplData.SQLOrder = k.genQueryOrderSQL()
 				case queryKindUpdEq:
 					tplData.SQLCond = k.genQueryCondSQL(numFields)
 				case queryKindDelEq:
 					tplData.SQLCond = k.genQueryCondSQL(0)
 				}
 				if err := tplQuery[k.Kind].Execute(fwriter, tplData); err != nil {
-					return kerrors.WithMsg(err, fmt.Sprintf("Failed to execute template for field %s on struct %s", tplData.PrimaryField.Ident, tplData.ModelIdent))
+					return kerrors.WithMsg(err, fmt.Sprintf("Failed to execute template for query kind %s on struct %s of model %s", k.Kind, tplData.ModelIdent, tplData.Prefix))
 				}
 			}
 		}
@@ -509,49 +520,37 @@ func (q *queryGroupDef) genQuerySQL() querySQLStrings {
 	}
 }
 
-func (q *queryField) genQueryCondSQL(offset int) queryCondSQLStrings {
-	sqlIdentNames := make([]string, 0, len(q.Cond))
-	sqlIdentParams := make([]string, 0, len(q.Cond))
-	sqlDBCond := make([]string, 0, len(q.Cond))
-	sqlIdentArgs := make([]string, 0, len(q.Cond))
-	sqlArrIdentArgs := make([]string, 0, len(q.Cond))
-	sqlArrIdentArgsLen := make([]string, 0, len(q.Cond))
+func (q *queryDef) genQueryCondSQL(offset int) queryCondSQLStrings {
+	sqlIdentParams := make([]string, 0, len(q.Conds))
+	sqlDBCond := make([]string, 0, len(q.Conds))
+	sqlIdentArgs := make([]string, 0, len(q.Conds))
+	sqlArrIdentArgs := make([]string, 0, len(q.Conds))
+	sqlArrIdentArgsLen := make([]string, 0, len(q.Conds))
 	paramCount := offset
-	for _, i := range q.Cond {
+	for _, i := range q.Conds {
 		paramName := strings.ToLower(i.Field.Ident)
 		dbName := i.Field.DBName
 		paramType := i.Field.GoType
-		identName := i.Field.Ident
 		condText := "="
 		switch i.Kind {
 		case condNeq:
-			identName = "Neq" + identName
 			condText = "<>"
 		case condLt:
-			identName = "Lt" + identName
 			condText = "<"
 		case condLeq:
-			identName = "Leq" + identName
 			condText = "<="
 		case condGt:
-			identName = "Gt" + identName
 			condText = ">"
 		case condGeq:
-			identName = "Geq" + identName
 			condText = ">="
 		case condIn:
 			paramName = paramName + "s"
 			paramType = "[]" + paramType
-			identName = "Has" + identName
 		case condLike:
 			paramName = paramName + "Prefix"
-			identName = "Like" + identName
 			condText = "LIKE"
-		default:
-			identName = "Eq" + identName
 		}
 
-		sqlIdentNames = append(sqlIdentNames, identName)
 		sqlIdentParams = append(sqlIdentParams, fmt.Sprintf("%s %s", paramName, paramType))
 		if i.Kind == condIn {
 			sqlDBCond = append(sqlDBCond, fmt.Sprintf(`%s IN (VALUES "+placeholders%s+")`, dbName, paramName))
@@ -564,13 +563,26 @@ func (q *queryField) genQueryCondSQL(offset int) queryCondSQLStrings {
 		}
 	}
 	return queryCondSQLStrings{
-		IdentNames:      strings.Join(sqlIdentNames, ""),
 		IdentParams:     strings.Join(sqlIdentParams, ", "),
 		DBCond:          strings.Join(sqlDBCond, " AND "),
 		IdentArgs:       strings.Join(sqlIdentArgs, ", "),
 		ArrIdentArgs:    sqlArrIdentArgs,
 		ArrIdentArgsLen: strings.Join(sqlArrIdentArgsLen, "+"),
 		ParamCount:      paramCount,
+	}
+}
+
+func (q *queryDef) genQueryOrderSQL() queryOrderSQLStrings {
+	colOrder := make([]string, 0, len(q.Order))
+	for _, i := range q.Order {
+		if i.Dir == "" {
+			colOrder = append(colOrder, i.Field.DBName)
+		} else {
+			colOrder = append(colOrder, fmt.Sprintf("%s %s", i.Field.DBName, i.Dir))
+		}
+	}
+	return queryOrderSQLStrings{
+		DBOrder: strings.Join(colOrder, ", "),
 	}
 }
 
@@ -729,26 +741,30 @@ func parseQueryDefinitions(queryObjects []dirObjPair, queryTag string, modelDefs
 		for _, j := range opts {
 			kind, err := parseQueryKind(j.Kind)
 			if err != nil {
-				return nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse query kind for struct %s", structName))
+				return nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse query kind for %s on struct %s", j.Name, structName))
+			}
+			if j.Name == "" {
+				return nil, kerrors.WithMsg(err, fmt.Sprintf("Query name missing for kind %s on struct %s", j.Kind, structName))
 			}
 			def := queryDef{
 				Kind: kind,
+				Name: j.Name,
 			}
 			switch kind {
 			case queryKindGetOneEq, queryKindGetGroupEq, queryKindUpdEq, queryKindDelEq:
 				{
 					if len(j.Conditions) == 0 {
-						return nil, kerrors.WithKind(err, ErrInvalidModel, fmt.Sprintf("Query missing condition fields for kind %s on struct %s", j.Kind, structName))
+						return nil, kerrors.WithKind(err, ErrInvalidModel, fmt.Sprintf("Query missing condition fields for %s %s on struct %s", j.Kind, j.Name, structName))
 					}
 					k := make([]queryCondField, 0, len(j.Conditions))
 					for _, c := range j.Conditions {
 						field, ok := mdef.fieldMap[c.Col]
 						if !ok {
-							return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Invalid condition field %s for kind %s on struct %s", c.Col, j.Kind, structName))
+							return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Invalid condition field %s for %s %s on struct %s", c.Col, j.Kind, j.Name, structName))
 						}
 						cond, err := parseCond(c.Cond)
 						if err != nil {
-							return nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse condition for kind %s field %s on struct %s", j.Kind, c.Col, structName))
+							return nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse condition for field %s on %s %s of struct %s", c.Col, j.Kind, j.Name, structName))
 						}
 						k = append(k, queryCondField{
 							Kind:  cond,
@@ -759,7 +775,28 @@ func parseQueryDefinitions(queryObjects []dirObjPair, queryTag string, modelDefs
 				}
 			default:
 				if len(j.Conditions) != 0 {
-					return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Query kind %s does not take conditions on struct %s", j.Kind, structName))
+					return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Query kind %s does not take conditions on %s of struct %s", j.Kind, j.Name, structName))
+				}
+			}
+			switch kind {
+			case queryKindGetGroup, queryKindGetGroupEq:
+				{
+					k := make([]queryOrderField, 0, len(j.Order))
+					for _, c := range j.Order {
+						field, ok := mdef.fieldMap[c.Col]
+						if !ok {
+							return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Invalid order field %s for %s %s on struct %s", c.Col, j.Kind, j.Name, structName))
+						}
+						k = append(k, queryOrderField{
+							Field: field,
+							Dir:   c.Dir,
+						})
+					}
+					def.Order = k
+				}
+			default:
+				if len(j.Order) != 0 {
+					return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Query kind %s does not take order on %s of struct %s", j.Kind, j.Name, structName))
 				}
 			}
 			queries = append(queries, def)
@@ -779,7 +816,7 @@ func parseQueryFields(astfields []astField, fieldMap map[string]modelField) ([]q
 	for n, i := range astfields {
 		dbName := i.Tags
 		if len(dbName) < 1 {
-			return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Query field opt must be dbname[;flag[,args ...][; ...]] for field %s", i.Ident))
+			return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Query field opt must be dbname for field %s", i.Ident))
 		}
 		if mfield, ok := fieldMap[dbName]; !ok || i.GoType != mfield.GoType {
 			return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Field %s with type %s does not exist on model", dbName, i.GoType))
@@ -825,6 +862,23 @@ func parseQueryKind(kind string) (queryKind, error) {
 		return queryKindDelEq, nil
 	default:
 		return queryKindUnknown, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Illegal query kind %s", kind))
+	}
+}
+
+func (q queryKind) String() string {
+	switch q {
+	case queryKindGetOneEq:
+		return "getoneeq"
+	case queryKindGetGroup:
+		return "getgroup"
+	case queryKindGetGroupEq:
+		return "getgroupeq"
+	case queryKindUpdEq:
+		return "updeq"
+	case queryKindDelEq:
+		return "deleq"
+	default:
+		return "unknown"
 	}
 }
 

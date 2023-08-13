@@ -45,6 +45,72 @@ func TestGenerate(t *testing.T) {
           "columns": ["first_name", "username"]
         }
       ]
+    },
+    "queries": {
+      "Model": [
+        {
+          "kind": "getoneeq",
+          "name": "ByID",
+          "conditions": [
+            {"col": "userid"}
+          ],
+          "order": [
+            {"col": "userid"}
+          ]
+        },
+        {
+          "kind": "deleq",
+          "name": "ByID",
+          "conditions": [
+            {"col": "userid"}
+          ]
+        },
+        {
+          "kind": "getoneeq",
+          "name": "ByUsername",
+          "conditions": [
+            {"col": "username"}
+          ],
+          "order": [
+            {"col": "userid"}
+          ]
+        },
+      ],
+      "userProps": [
+        {
+          "kind": "updeq",
+          "name": "ByID",
+          "conditions": [
+            {"col": "userid"}
+          ]
+        }
+      ],
+      "usernameProps": [
+        {
+          "kind": "updeq",
+          "name": "ByID",
+          "conditions": [
+            {"col": "userid"}
+          ]
+        }
+      ],
+    }
+  },
+  "sm": {
+    "queries": {
+      "SM": [
+        {
+          "kind": "getoneeq",
+          "name": "ManyCond",
+          "conditions": [
+            {"col": "userid", "cond": "neq"},
+            {"col": "username", "cond": "lt"},
+            {"col": "first_name", "cond": "leq"},
+            {"col": "last_name", "cond": "gt"},
+            {"col": "email", "cond": "geq"}
+          ]
+        }
+      ]
     }
   }
 }
@@ -59,20 +125,20 @@ type (
 	//forge:model user
 	//forge:model:query user
 	Model struct {
-		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"userid;getoneeq,userid;deleq,userid|eq"` + "`" + `
-		Username string ` + "`" + `model:"username,VARCHAR(255) NOT NULL UNIQUE" query:"username;getoneeq,username"` + "`" + `
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"userid"` + "`" + `
+		Username string ` + "`" + `model:"username,VARCHAR(255) NOT NULL UNIQUE" query:"username"` + "`" + `
 		FirstName string ` + "`" + `model:"first_name,VARCHAR(255) NOT NULL" query:"first_name"` + "`" + `
 	}
 
 	//forge:model:query user
 	userProps struct {
-		Username string ` + "`" + `query:"username;updeq,userid"` + "`" + `
+		Username string ` + "`" + `query:"username"` + "`" + `
 		FirstName string ` + "`" + `query:"first_name"` + "`" + `
 	}
 
 	//forge:model:query user
 	usernameProps struct {
-		Username string ` + "`" + `query:"username;updeq,userid"` + "`" + `
+		Username string ` + "`" + `query:"username"` + "`" + `
 	}
 
 	//forge:modelnope
@@ -84,7 +150,7 @@ type (
 	//forge:model sm
 	//forge:model:query sm
 	SM struct {
-		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"userid;getoneeq,userid|neq,username|lt,first_name|leq,last_name|gt,email|geq"` + "`" + `
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY" query:"userid"` + "`" + `
 		Username string ` + "`" + `model:"username,VARCHAR(255)" query:"username"` + "`" + `
 		FirstName string ` + "`" + `model:"first_name,VARCHAR(255)" query:"first_name"` + "`" + `
 		LastName string ` + "`" + `model:"last_name,VARCHAR(255)" query:"last_name"` + "`" + `

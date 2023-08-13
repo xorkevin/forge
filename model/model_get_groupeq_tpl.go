@@ -1,7 +1,7 @@
 package model
 
 const templateGetGroupEq = `
-func (t *{{.Prefix}}ModelTable) Get{{.ModelIdent}}{{.SQLCond.IdentNames}}Ord{{.PrimaryField.Ident}}(ctx context.Context, d sqldb.Executor, {{.SQLCond.IdentParams}}, orderasc bool, limit, offset int) (_ []{{.ModelIdent}}, retErr error) {
+func (t *{{.Prefix}}ModelTable) Get{{.ModelIdent}}{{.Name}}(ctx context.Context, d sqldb.Executor, {{.SQLCond.IdentParams}}, limit, offset int) (_ []{{.ModelIdent}}, retErr error) {
 	{{- if .SQLCond.ArrIdentArgs }}
 	paramCount := {{.SQLCond.ParamCount}}
 	args := make([]interface{}, 0, paramCount{{with .SQLCond.ArrIdentArgsLen}}+{{.}}{{end}})
@@ -19,12 +19,8 @@ func (t *{{.Prefix}}ModelTable) Get{{.ModelIdent}}{{.SQLCond.IdentNames}}Ord{{.P
 		placeholders{{.}} = strings.Join(placeholders, ", ")
 	}
 	{{- end }}
-	order := "DESC"
-	if orderasc {
-		order = "ASC"
-	}
 	res := make([]{{.ModelIdent}}, 0, limit)
-	rows, err := d.QueryContext(ctx, "SELECT {{.SQL.DBNames}} FROM "+t.TableName+" WHERE {{.SQLCond.DBCond}} ORDER BY {{.PrimaryField.DBName}} "+order+" LIMIT $1 OFFSET $2;", {{if .SQLCond.ArrIdentArgs}}args...{{else}}limit, offset, {{.SQLCond.IdentArgs}}{{end}})
+	rows, err := d.QueryContext(ctx, "SELECT {{.SQL.DBNames}} FROM "+t.TableName+" WHERE {{.SQLCond.DBCond}}{{with .SQLOrder.DBOrder}} ORDER BY {{.}}{{end}} LIMIT $1 OFFSET $2;", {{if .SQLCond.ArrIdentArgs}}args...{{else}}limit, offset, {{.SQLCond.IdentArgs}}{{end}})
 	if err != nil {
 		return nil, err
 	}
