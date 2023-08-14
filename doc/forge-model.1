@@ -1,5 +1,5 @@
 .nh
-.TH "forge" "1" "Apr 2023" "" ""
+.TH "forge" "1" "Aug 2023" "" ""
 
 .SH NAME
 .PP
@@ -8,7 +8,7 @@ forge-model - Generates models
 
 .SH SYNOPSIS
 .PP
-\fBforge model [query ...] [flags]\fP
+\fBforge model [flags]\fP
 
 
 .SH DESCRIPTION
@@ -30,7 +30,18 @@ GOFILE: name of the go source file
 
 .PP
 forge model code generates go functions for SQL select, insert, update, and
-delete for a model by default, with additional queries provided as arguments.
+delete for a model. Only structs with the following comment directive are
+considered:
+
+.PP
+.RS
+
+.nf
+//forge:model modelPrefix
+Model struct {}
+
+.fi
+.RE
 
 .PP
 The SQL table's columns for a model are specified by the "model" tag on fields
@@ -41,7 +52,7 @@ following syntax:
 .RS
 
 .nf
-column_name,sql_type[;opt[,args ...][; ...]]
+column_name,sql_type
 
 .fi
 .RE
@@ -50,60 +61,83 @@ column_name,sql_type[;opt[,args ...][; ...]]
 Fields without a "model" tag are ignored.
 
 .PP
-Valid opts are:
-
-.RS
-.IP \(bu 2
-index: args(field,...), creates a index from the provided fields and
-current field
-
-.RE
-
-.PP
-A query allows additional common case select statements to be code generated.
-It is specified by a "query" tag on a struct representing a row of the query
-result with a value of the syntax:
+A query allows additional statements to be code generated. It is specified by a
+"model" tag on a struct which represents a column of the query result and has
+the following syntax:
 
 .PP
 .RS
 
 .nf
-column_name[;flag[,args ...][; ...]]
+column_name[,sql_type]
 
 .fi
 .RE
 
 .PP
 column_name refers to the column name defined in the model. The go field type
-must also be the same between the model and the query.
+must also be the same between the model and the query. sql_type is optional and
+ignored for queries. Likewise, fields without a "model" tag are ignored.
 
 .PP
-Fields without a "query" tag are ignored.
+A separate schema file (model.json by default) is used to specify additional
+constraints, conditions, and queries. The schema is as follows:
 
 .PP
-Valid flags are:
+.RS
+
+.nf
+{
+  "modelPrefix": {
+    "model": {
+      "setup": "optional text appended to the end of the model setup query",
+      "constraints": [
+        {"kind": "PRIMARY KEY/UNIQUE/etc.", "columns": ["col1", "etc"]}
+      ],
+      "indicies": [
+        {"columns": ["col1", "etc"]}
+      ]
+    },
+    "queries": {
+      "StructName": [
+        {
+          "kind": "getoneeq/getgroup/etc.",
+          "name": "QueryName",
+          "conditions": [
+            {"col": "col1", "cond": "eq (default)/neq/etc."}
+          ],
+          "order": [
+            {"col": "col1", "dir": "empty/ASC/DESC/etc."}
+          ]
+        }
+      ]
+    }
+  }
+}
+
+.fi
+.RE
+
+.PP
+Valid query kinds are:
 
 .RS
 .IP \(bu 2
-getoneeq: args(equal_field,...), gets a single row where the equal field(s)
-are equal to the input
+getoneeq: gets a single row where the equal field(s) are equal to the input
 .IP \(bu 2
-getgroup: (no args), gets all rows ordered by the field value
+getgroup: gets all rows
 .IP \(bu 2
-getgroupeq: args(equal_field,...), gets all rows where the equal field(s)
-are equal to the input ordered by the field value
+getgroupeq: gets all rows where the field(s) are equal to the input
 .IP \(bu 2
-updeq: args(equal_field,...), updates all rows where the equal fields(s)
-are equal to the input
+updeq: updates all rows where the fields(s) are equal to the input
 .IP \(bu 2
-deleq: args(equal_field,...), deletes all rows where the equal fields(s)
-are equal to the input
+deleq: deletes all rows where the fields(s) are equal to the input
 
 .RE
 
 .PP
-equal_field by default has a condition of eq, but it may be explicitly
-specified by column_name|cond. cond may be one of:
+field by default has a condition of eq, but it may be explicitly specified.
+cond may be one of:
 
 .RS
 .IP \(bu 2
@@ -156,8 +190,8 @@ like: column value like the input
 	comment directive of types that are model queries
 
 .PP
-\fB--query-tag\fP="query"
-	go struct tag for defining query fields
+\fB-s\fP, \fB--schema\fP="model.json"
+	model schema
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS

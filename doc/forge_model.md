@@ -12,46 +12,71 @@ forge model is called with the following environment variables:
     GOFILE: name of the go source file
 
 forge model code generates go functions for SQL select, insert, update, and
-delete for a model by default, with additional queries provided as arguments.
+delete for a model. Only structs with the following comment directive are
+considered:
+
+    //forge:model modelPrefix
+    Model struct {}
 
 The SQL table's columns for a model are specified by the "model" tag on fields
 of a Go struct representing a row of the table. A "model" tag's value has the
 following syntax:
 
-    column_name,sql_type[;opt[,args ...][; ...]]
+    column_name,sql_type
 
 Fields without a "model" tag are ignored.
 
-Valid opts are:
+A query allows additional statements to be code generated. It is specified by a
+"model" tag on a struct which represents a column of the query result and has
+the following syntax:
 
-- index: args(field,...), creates a index from the provided fields and
-  current field
-
-A query allows additional common case select statements to be code generated.
-It is specified by a "query" tag on a struct representing a row of the query
-result with a value of the syntax:
-
-    column_name[;flag[,args ...][; ...]]
+    column_name[,sql_type]
 
 column_name refers to the column name defined in the model. The go field type
-must also be the same between the model and the query.
+must also be the same between the model and the query. sql_type is optional and
+ignored for queries. Likewise, fields without a "model" tag are ignored.
 
-Fields without a "query" tag are ignored.
+A separate schema file (model.json by default) is used to specify additional
+constraints, conditions, and queries. The schema is as follows:
 
-Valid flags are:
+    {
+      "modelPrefix": {
+        "model": {
+          "setup": "optional text appended to the end of the model setup query",
+          "constraints": [
+            {"kind": "PRIMARY KEY/UNIQUE/etc.", "columns": ["col1", "etc"]}
+          ],
+          "indicies": [
+            {"columns": ["col1", "etc"]}
+          ]
+        },
+        "queries": {
+          "StructName": [
+            {
+              "kind": "getoneeq/getgroup/etc.",
+              "name": "QueryName",
+              "conditions": [
+                {"col": "col1", "cond": "eq (default)/neq/etc."}
+              ],
+              "order": [
+                {"col": "col1", "dir": "empty/ASC/DESC/etc."}
+              ]
+            }
+          ]
+        }
+      }
+    }
 
-- getoneeq: args(equal_field,...), gets a single row where the equal field(s)
-  are equal to the input
-- getgroup: (no args), gets all rows ordered by the field value
-- getgroupeq: args(equal_field,...), gets all rows where the equal field(s)
-  are equal to the input ordered by the field value
-- updeq: args(equal_field,...), updates all rows where the equal fields(s)
-  are equal to the input
-- deleq: args(equal_field,...), deletes all rows where the equal fields(s)
-  are equal to the input
+Valid query kinds are:
 
-equal_field by default has a condition of eq, but it may be explicitly
-specified by column_name|cond. cond may be one of:
+- getoneeq: gets a single row where the equal field(s) are equal to the input
+- getgroup: gets all rows
+- getgroupeq: gets all rows where the field(s) are equal to the input
+- updeq: updates all rows where the fields(s) are equal to the input
+- deleq: deletes all rows where the fields(s) are equal to the input
+
+field by default has a condition of eq, but it may be explicitly specified.
+cond may be one of:
 
 - eq: column value equals the input
 - neq: column value not equal to the input
@@ -64,7 +89,7 @@ specified by column_name|cond. cond may be one of:
 
 
 ```
-forge model [query ...] [flags]
+forge model [flags]
 ```
 
 ### Options
@@ -77,7 +102,7 @@ forge model [query ...] [flags]
       --model-tag string         go struct tag for defining model fields (default "model")
   -o, --output string            output filename (default "model_gen.go")
       --query-directive string   comment directive of types that are model queries (default "forge:model:query")
-      --query-tag string         go struct tag for defining query fields (default "query")
+  -s, --schema string            model schema (default "model.json")
 ```
 
 ### Options inherited from parent commands
