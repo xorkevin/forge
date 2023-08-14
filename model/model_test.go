@@ -53,9 +53,6 @@ func TestGenerate(t *testing.T) {
           "name": "ByID",
           "conditions": [
             {"col": "userid"}
-          ],
-          "order": [
-            {"col": "userid"}
           ]
         },
         {
@@ -70,11 +67,8 @@ func TestGenerate(t *testing.T) {
           "name": "ByUsername",
           "conditions": [
             {"col": "username"}
-          ],
-          "order": [
-            {"col": "userid"}
           ]
-        },
+        }
       ],
       "userProps": [
         {
@@ -94,6 +88,64 @@ func TestGenerate(t *testing.T) {
           ]
         }
       ],
+      "Info": [
+        {
+          "kind": "getgroup",
+          "name": "All",
+          "order": [
+            {"col": "userid"}
+          ]
+        },
+        {
+          "kind": "getgroupeq",
+          "name": "ByIDs",
+          "conditions": [
+            {"col": "userid", "cond": "in"}
+          ],
+          "order": [
+            {"col": "userid"}
+          ]
+        },
+        {
+          "kind": "getgroupeq",
+          "name": "LikeUsername",
+          "conditions": [
+            {"col": "username", "cond": "like"}
+          ],
+          "order": [
+            {"col": "username"}
+          ]
+        }
+      ],
+      "InfoAgain": [
+        {
+          "kind": "getgroup",
+          "name": "All",
+          "order": [
+            {"col": "userid"}
+          ]
+        },
+        {
+          "kind": "getgroupeq",
+          "name": "ByIDs",
+          "conditions": [
+            {"col": "userid", "cond": "in"}
+          ],
+          "order": [
+            {"col": "userid"}
+          ]
+        },
+        {
+          "kind": "getgroupeq",
+          "name": "LikeUsername",
+          "conditions": [
+            {"col": "username", "cond": "like"}
+          ],
+          "order": [
+            {"col": "username"}
+          ]
+        }
+      ]
     }
   },
   "sm": {
@@ -167,8 +219,8 @@ type (
 type(
 	//forge:model:query user
 	Info struct {
-		Userid string ` + "`" + `query:"userid;getgroup;getgroupeq,userid|in"` + "`" + `
-		Username string ` + "`" + `query:"username;getgroupeq,username|like"` + "`" + `
+		Userid string ` + "`" + `query:"userid"` + "`" + `
+		Username string ` + "`" + `query:"username"` + "`" + `
 	}
 )
 `),
@@ -249,13 +301,9 @@ func (t *userModelTable) InsertBulk(ctx context.Context, d sqldb.Executor, model
 	return nil
 }
 
-func (t *userModelTable) GetInfoOrdUserid(ctx context.Context, d sqldb.Executor, orderasc bool, limit, offset int) (_ []Info, retErr error) {
-	order := "DESC"
-	if orderasc {
-		order = "ASC"
-	}
+func (t *userModelTable) GetInfoAll(ctx context.Context, d sqldb.Executor, limit, offset int) (_ []Info, retErr error) {
 	res := make([]Info, 0, limit)
-	rows, err := d.QueryContext(ctx, "SELECT userid, username FROM "+t.TableName+" ORDER BY userid "+order+" LIMIT $1 OFFSET $2;", limit, offset)
+	rows, err := d.QueryContext(ctx, "SELECT userid, username FROM "+t.TableName+" ORDER BY userid LIMIT $1 OFFSET $2;", limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +325,7 @@ func (t *userModelTable) GetInfoOrdUserid(ctx context.Context, d sqldb.Executor,
 	return res, nil
 }
 
-func (t *userModelTable) GetInfoHasUseridOrdUserid(ctx context.Context, d sqldb.Executor, userids []string, orderasc bool, limit, offset int) (_ []Info, retErr error) {
+func (t *userModelTable) GetInfoByIDs(ctx context.Context, d sqldb.Executor, userids []string, limit, offset int) (_ []Info, retErr error) {
 	paramCount := 2
 	args := make([]interface{}, 0, paramCount+len(userids))
 	args = append(args, limit, offset)
@@ -291,12 +339,8 @@ func (t *userModelTable) GetInfoHasUseridOrdUserid(ctx context.Context, d sqldb.
 		}
 		placeholdersuserids = strings.Join(placeholders, ", ")
 	}
-	order := "DESC"
-	if orderasc {
-		order = "ASC"
-	}
 	res := make([]Info, 0, limit)
-	rows, err := d.QueryContext(ctx, "SELECT userid, username FROM "+t.TableName+" WHERE userid IN (VALUES "+placeholdersuserids+") ORDER BY userid "+order+" LIMIT $1 OFFSET $2;", args...)
+	rows, err := d.QueryContext(ctx, "SELECT userid, username FROM "+t.TableName+" WHERE userid IN (VALUES "+placeholdersuserids+") ORDER BY userid LIMIT $1 OFFSET $2;", args...)
 	if err != nil {
 		return nil, err
 	}
@@ -318,13 +362,9 @@ func (t *userModelTable) GetInfoHasUseridOrdUserid(ctx context.Context, d sqldb.
 	return res, nil
 }
 
-func (t *userModelTable) GetInfoLikeUsernameOrdUsername(ctx context.Context, d sqldb.Executor, usernamePrefix string, orderasc bool, limit, offset int) (_ []Info, retErr error) {
-	order := "DESC"
-	if orderasc {
-		order = "ASC"
-	}
+func (t *userModelTable) GetInfoLikeUsername(ctx context.Context, d sqldb.Executor, usernamePrefix string, limit, offset int) (_ []Info, retErr error) {
 	res := make([]Info, 0, limit)
-	rows, err := d.QueryContext(ctx, "SELECT userid, username FROM "+t.TableName+" WHERE username LIKE $3 ORDER BY username "+order+" LIMIT $1 OFFSET $2;", limit, offset, usernamePrefix)
+	rows, err := d.QueryContext(ctx, "SELECT userid, username FROM "+t.TableName+" WHERE username LIKE $3 ORDER BY username LIMIT $1 OFFSET $2;", limit, offset, usernamePrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -346,7 +386,7 @@ func (t *userModelTable) GetInfoLikeUsernameOrdUsername(ctx context.Context, d s
 	return res, nil
 }
 
-func (t *userModelTable) GetModelEqUserid(ctx context.Context, d sqldb.Executor, userid string) (*Model, error) {
+func (t *userModelTable) GetModelByID(ctx context.Context, d sqldb.Executor, userid string) (*Model, error) {
 	m := &Model{}
 	if err := d.QueryRowContext(ctx, "SELECT userid, username, first_name FROM "+t.TableName+" WHERE userid = $1;", userid).Scan(&m.Userid, &m.Username, &m.FirstName); err != nil {
 		return nil, err
@@ -354,12 +394,12 @@ func (t *userModelTable) GetModelEqUserid(ctx context.Context, d sqldb.Executor,
 	return m, nil
 }
 
-func (t *userModelTable) DelEqUserid(ctx context.Context, d sqldb.Executor, userid string) error {
+func (t *userModelTable) DelByID(ctx context.Context, d sqldb.Executor, userid string) error {
 	_, err := d.ExecContext(ctx, "DELETE FROM "+t.TableName+" WHERE userid = $1;", userid)
 	return err
 }
 
-func (t *userModelTable) GetModelEqUsername(ctx context.Context, d sqldb.Executor, username string) (*Model, error) {
+func (t *userModelTable) GetModelByUsername(ctx context.Context, d sqldb.Executor, username string) (*Model, error) {
 	m := &Model{}
 	if err := d.QueryRowContext(ctx, "SELECT userid, username, first_name FROM "+t.TableName+" WHERE username = $1;", username).Scan(&m.Userid, &m.Username, &m.FirstName); err != nil {
 		return nil, err
@@ -367,7 +407,7 @@ func (t *userModelTable) GetModelEqUsername(ctx context.Context, d sqldb.Executo
 	return m, nil
 }
 
-func (t *userModelTable) UpduserPropsEqUserid(ctx context.Context, d sqldb.Executor, m *userProps, userid string) error {
+func (t *userModelTable) UpduserPropsByID(ctx context.Context, d sqldb.Executor, m *userProps, userid string) error {
 	_, err := d.ExecContext(ctx, "UPDATE "+t.TableName+" SET (username, first_name) = ($1, $2) WHERE userid = $3;", m.Username, m.FirstName, userid)
 	if err != nil {
 		return err
@@ -375,7 +415,7 @@ func (t *userModelTable) UpduserPropsEqUserid(ctx context.Context, d sqldb.Execu
 	return nil
 }
 
-func (t *userModelTable) UpdusernamePropsEqUserid(ctx context.Context, d sqldb.Executor, m *usernameProps, userid string) error {
+func (t *userModelTable) UpdusernamePropsByID(ctx context.Context, d sqldb.Executor, m *usernameProps, userid string) error {
 	_, err := d.ExecContext(ctx, "UPDATE "+t.TableName+" SET username = $1 WHERE userid = $2;", m.Username, userid)
 	if err != nil {
 		return err
@@ -424,7 +464,7 @@ func (t *smModelTable) InsertBulk(ctx context.Context, d sqldb.Executor, models 
 	return nil
 }
 
-func (t *smModelTable) GetSMNeqUseridLtUsernameLeqFirstNameGtLastNameGeqEmail(ctx context.Context, d sqldb.Executor, userid string, username string, firstname string, lastname string, email string) (*SM, error) {
+func (t *smModelTable) GetSMManyCond(ctx context.Context, d sqldb.Executor, userid string, username string, firstname string, lastname string, email string) (*SM, error) {
 	m := &SM{}
 	if err := d.QueryRowContext(ctx, "SELECT userid, username, first_name, last_name, email FROM "+t.TableName+" WHERE userid <> $1 AND username < $2 AND first_name <= $3 AND last_name > $4 AND email >= $5;", userid, username, firstname, lastname, email).Scan(&m.Userid, &m.Username, &m.FirstName, &m.LastName, &m.Email); err != nil {
 		return nil, err
