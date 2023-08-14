@@ -487,6 +487,30 @@ func (t *smModelTable) GetSMManyCond(ctx context.Context, d sqldb.Executor, user
 			Err: ErrEnv,
 		},
 		{
+			Name: "errors on invalid schema file",
+			Fsys: fstest.MapFS{
+				"model.json": &fstest.MapFile{
+					Data:    []byte(`"bogus"`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrInvalidSchema,
+		},
+		{
 			Name: "errors on no models",
 			Fsys: fstest.MapFS{
 				"stuff.go": &fstest.MapFile{
@@ -1525,6 +1549,10 @@ func TestError(t *testing.T) {
 		{
 			Err:    ErrEnv,
 			String: "Invalid execution environment",
+		},
+		{
+			Err:    ErrInvalidSchema,
+			String: "Invalid schema",
 		},
 		{
 			Err:    ErrInvalidFile,

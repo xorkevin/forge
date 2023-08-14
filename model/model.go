@@ -32,16 +32,19 @@ const (
 var (
 	// ErrEnv is returned when validation is run outside of go generate
 	ErrEnv errEnv
-	// ErrInvalidFile is returned when parsing an invalid validation file
+	// ErrInvalidSchema is returned when parsing an invalid schema file
+	ErrInvalidSchema errInvalidSchema
+	// ErrInvalidFile is returned when parsing an invalid model file
 	ErrInvalidFile errInvalidFile
-	// ErrInvalidModel is returned when parsing a model with invalid syntax
+	// ErrInvalidModel is returned when checking an invalid model
 	ErrInvalidModel errInvalidModel
 )
 
 type (
-	errEnv          struct{}
-	errInvalidFile  struct{}
-	errInvalidModel struct{}
+	errEnv           struct{}
+	errInvalidFile   struct{}
+	errInvalidModel  struct{}
+	errInvalidSchema struct{}
 )
 
 func (e errEnv) Error() string {
@@ -54,6 +57,10 @@ func (e errInvalidFile) Error() string {
 
 func (e errInvalidModel) Error() string {
 	return "Invalid model"
+}
+
+func (e errInvalidSchema) Error() string {
+	return "Invalid schema"
 }
 
 type (
@@ -262,11 +269,11 @@ func Generate(ctx context.Context, log klog.Logger, outputfs fs.FS, inputfs fs.F
 	if opts.Schema != "" {
 		if f, err := fs.ReadFile(inputfs, opts.Schema); err != nil {
 			if !errors.Is(err, fs.ErrNotExist) {
-				return kerrors.WithKind(err, ErrInvalidFile, fmt.Sprintf("Failed reading schema file: %s", opts.Schema))
+				return kerrors.WithMsg(err, fmt.Sprintf("Failed reading schema file: %s", opts.Schema))
 			}
 		} else {
 			if err := json.Unmarshal(f, &schema); err != nil {
-				return kerrors.WithKind(err, ErrInvalidFile, fmt.Sprintf("Invalid schema file: %s", opts.Schema))
+				return kerrors.WithKind(err, ErrInvalidSchema, fmt.Sprintf("Invalid schema file: %s", opts.Schema))
 			}
 		}
 	}
@@ -610,7 +617,7 @@ func parseModelDefinitions(modelObjects []dirObjPair, modelTag string, fset *tok
 		}
 		modelFields, fieldMap, err := parseModelFields(astFields)
 		if err != nil {
-			return nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse model fields for struct %s", structName))
+			return nil, kerrors.WithMsg(err, fmt.Sprintf("Invalid model fields for struct %s", structName))
 		}
 		constraints := make([]modelConstraint, 0, len(opts.Model.Constraints))
 		for _, i := range opts.Model.Constraints {
@@ -624,7 +631,7 @@ func parseModelDefinitions(modelObjects []dirObjPair, modelTag string, fset *tok
 			for _, j := range i.Columns {
 				f, ok := fieldMap[j]
 				if !ok {
-					return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Missing field %s for constraint of struct %s", j, structName))
+					return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Unknown field %s for constraint of struct %s", j, structName))
 				}
 				fields = append(fields, f)
 			}
@@ -642,7 +649,7 @@ func parseModelDefinitions(modelObjects []dirObjPair, modelTag string, fset *tok
 			for _, j := range i.Columns {
 				f, ok := fieldMap[j]
 				if !ok {
-					return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Missing field %s for index of struct %s", j, structName))
+					return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Unknown field %s for index of struct %s", j, structName))
 				}
 				fields = append(fields, f)
 			}
@@ -722,17 +729,17 @@ func parseQueryDefinitions(queryObjects []dirObjPair, modelTag string, modelDefs
 		}
 		fields, err := parseQueryFields(astFields, mdef.fieldMap)
 		if err != nil {
-			return nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse query fields for struct %s", structName))
+			return nil, kerrors.WithMsg(err, fmt.Sprintf("Invalid query fields for struct %s", structName))
 		}
 		opts := schema[prefix].Queries[structName]
 		if len(opts) == 0 {
-			return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Query struct %s does not contain queries", structName))
+			return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Query struct %s missing queries", structName))
 		}
 		queries := make([]queryDef, 0, len(opts))
 		for _, j := range opts {
 			kind, err := parseQueryKind(j.Kind)
 			if err != nil {
-				return nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse query kind for %s on struct %s", j.Name, structName))
+				return nil, kerrors.WithMsg(err, fmt.Sprintf("Invalid query kind for %s on struct %s", j.Name, structName))
 			}
 			if j.Name == "" {
 				return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Query name missing for kind %s on struct %s", j.Kind, structName))
@@ -751,11 +758,11 @@ func parseQueryDefinitions(queryObjects []dirObjPair, modelTag string, modelDefs
 					for _, c := range j.Conditions {
 						field, ok := mdef.fieldMap[c.Col]
 						if !ok {
-							return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Invalid condition field %s for %s %s on struct %s", c.Col, j.Kind, j.Name, structName))
+							return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Unknown condition field %s for %s %s on struct %s", c.Col, j.Kind, j.Name, structName))
 						}
 						cond, err := parseCond(c.Cond)
 						if err != nil {
-							return nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse condition for field %s on %s %s of struct %s", c.Col, j.Kind, j.Name, structName))
+							return nil, kerrors.WithMsg(err, fmt.Sprintf("Invalid condition for field %s on query %s %s of struct %s", c.Col, j.Kind, j.Name, structName))
 						}
 						k = append(k, queryCondField{
 							Kind:  cond,
@@ -776,7 +783,7 @@ func parseQueryDefinitions(queryObjects []dirObjPair, modelTag string, modelDefs
 					for _, c := range j.Order {
 						field, ok := mdef.fieldMap[c.Col]
 						if !ok {
-							return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Invalid order field %s for %s %s on struct %s", c.Col, j.Kind, j.Name, structName))
+							return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Unknown order field %s for %s %s on struct %s", c.Col, j.Kind, j.Name, structName))
 						}
 						k = append(k, queryOrderField{
 							Field: field,
