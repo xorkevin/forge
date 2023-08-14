@@ -218,14 +218,6 @@ type (
 	}
 )
 
-func (f modelField) String() string {
-	return f.Ident + ":" + f.GoType
-}
-
-func (f queryField) String() string {
-	return f.Ident + ":" + f.GoType
-}
-
 type (
 	Opts struct {
 		Output         string
@@ -930,7 +922,7 @@ func findFields(tagName string, structType *ast.StructType, fset *token.FileSet)
 		}
 
 		if len(field.Names) != 1 {
-			return nil, kerrors.WithKind(nil, ErrInvalidModel, "Only one field allowed per tag")
+			return nil, kerrors.WithKind(nil, ErrInvalidFile, "Only one field allowed per tag")
 		}
 
 		ident := field.Names[0].Name

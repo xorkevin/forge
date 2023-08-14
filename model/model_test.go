@@ -93,7 +93,7 @@ func TestGenerate(t *testing.T) {
           "kind": "getgroup",
           "name": "All",
           "order": [
-            {"col": "userid"}
+            {"col": "userid", "dir": "DESC"}
           ]
         },
         {
@@ -303,7 +303,7 @@ func (t *userModelTable) InsertBulk(ctx context.Context, d sqldb.Executor, model
 
 func (t *userModelTable) GetInfoAll(ctx context.Context, d sqldb.Executor, limit, offset int) (_ []Info, retErr error) {
 	res := make([]Info, 0, limit)
-	rows, err := d.QueryContext(ctx, "SELECT userid, username FROM "+t.TableName+" ORDER BY userid LIMIT $1 OFFSET $2;", limit, offset)
+	rows, err := d.QueryContext(ctx, "SELECT userid, username FROM "+t.TableName+" ORDER BY userid DESC LIMIT $1 OFFSET $2;", limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -551,7 +551,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrInvalidModel,
+			Err: ErrInvalidFile,
 		},
 		{
 			Name: "errors on malformed model tag",
@@ -929,10 +929,13 @@ type (
 
 type (
 	//forge:model user
-	//forge:model:query user
 	Model struct {
 		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
-		Other, Another string ` + "`" + `model:"userid"` + "`" + `
+	}
+
+  //forge:model:query user
+	Info struct {
+		Userid, Other string ` + "`" + `model:"userid"` + "`" + `
 	}
 )
 `),
@@ -940,7 +943,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrInvalidModel,
+			Err: ErrInvalidFile,
 		},
 		{
 			Name: "errors on malformed query tag",
@@ -1258,6 +1261,91 @@ type (
 			},
 			Err: ErrInvalidModel,
 		},
+		{
+			Name: "errors on providing query order when not accepted",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	//forge:model:query user
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+				"model.json": &fstest.MapFile{
+					Data: []byte(`
+{
+  "user": {
+    "queries": {
+      "Model": [
+        {
+          "kind": "getoneeq",
+          "name": "ByID",
+          "conditions": [
+            {"col": "userid"}
+          ],
+          "order": [
+            {"col": "userid"}
+          ]
+        }
+      ]
+    }
+  }
+}
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrInvalidModel,
+		},
+		{
+			Name: "errors on invalid query order field",
+			Fsys: fstest.MapFS{
+				"stuff.go": &fstest.MapFile{
+					Data: []byte(`package somepackage
+
+type (
+	//forge:model user
+	//forge:model:query user
+	Model struct {
+		Userid string ` + "`" + `model:"userid,VARCHAR(31) PRIMARY KEY"` + "`" + `
+	}
+)
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+				"model.json": &fstest.MapFile{
+					Data: []byte(`
+{
+  "user": {
+    "queries": {
+      "Model": [
+        {
+          "kind": "getgroup",
+          "name": "All",
+          "order": [
+            {"col": "bogus"}
+          ]
+        }
+      ]
+    }
+  }
+}
+`),
+					Mode:    filemode,
+					ModTime: now,
+				},
+			},
+			Err: ErrInvalidModel,
+		},
 	} {
 		tc := tc
 		t.Run(tc.Name, func(t *testing.T) {
@@ -1384,4 +1472,70 @@ type (
 		})
 		assert.ErrorIs(err, gopackages.ErrorConflictingPackage{})
 	})
+}
+
+func TestQueryKindString(t *testing.T) {
+	t.Parallel()
+
+	assert := require.New(t)
+
+	for _, tc := range []struct {
+		Kind   queryKind
+		String string
+	}{
+		{
+			Kind:   queryKindGetOneEq,
+			String: "getoneeq",
+		},
+		{
+			Kind:   queryKindGetGroup,
+			String: "getgroup",
+		},
+		{
+			Kind:   queryKindGetGroupEq,
+			String: "getgroupeq",
+		},
+		{
+			Kind:   queryKindUpdEq,
+			String: "updeq",
+		},
+		{
+			Kind:   queryKindDelEq,
+			String: "deleq",
+		},
+		{
+			Kind:   queryKindUnknown,
+			String: "unknown",
+		},
+	} {
+		tc := tc
+		assert.Equal(tc.String, tc.Kind.String())
+	}
+}
+
+func TestError(t *testing.T) {
+	t.Parallel()
+
+	assert := require.New(t)
+
+	for _, tc := range []struct {
+		Err    error
+		String string
+	}{
+		{
+			Err:    ErrEnv,
+			String: "Invalid execution environment",
+		},
+		{
+			Err:    ErrInvalidFile,
+			String: "Invalid file",
+		},
+		{
+			Err:    ErrInvalidModel,
+			String: "Invalid model",
+		},
+	} {
+		tc := tc
+		assert.Equal(tc.String, tc.Err.Error())
+	}
 }
