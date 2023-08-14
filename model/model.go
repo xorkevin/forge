@@ -235,7 +235,6 @@ type (
 		ModelDirective string
 		QueryDirective string
 		ModelTag       string
-		QueryTag       string
 	}
 
 	ExecEnv struct {
@@ -334,7 +333,7 @@ func Generate(ctx context.Context, log klog.Logger, outputfs fs.FS, inputfs fs.F
 	for _, i := range modelDefs {
 		modelDefMap[i.Prefix] = i
 	}
-	queryGroupDefs, err := parseQueryDefinitions(queryObjects, opts.QueryTag, modelDefMap, fset, schema)
+	queryGroupDefs, err := parseQueryDefinitions(queryObjects, opts.ModelTag, modelDefMap, fset, schema)
 	if err != nil {
 		return err
 	}
@@ -615,7 +614,7 @@ func parseModelDefinitions(modelObjects []dirObjPair, modelTag string, fset *tok
 			return nil, err
 		}
 		if len(astFields) == 0 {
-			return nil, kerrors.WithKind(nil, ErrInvalidFile, "No model fields found on struct")
+			return nil, kerrors.WithKind(nil, ErrInvalidModel, "No model fields found on struct")
 		}
 		modelFields, fieldMap, err := parseModelFields(astFields)
 		if err != nil {
@@ -695,7 +694,7 @@ func parseModelFields(astfields []astField) ([]modelField, map[string]modelField
 	return fields, seenFields, nil
 }
 
-func parseQueryDefinitions(queryObjects []dirObjPair, queryTag string, modelDefs map[string]modelDef, fset *token.FileSet, schema map[string]modelConfig) (map[string][]queryGroupDef, error) {
+func parseQueryDefinitions(queryObjects []dirObjPair, modelTag string, modelDefs map[string]modelDef, fset *token.FileSet, schema map[string]modelConfig) (map[string][]queryGroupDef, error) {
 	queryGroupDefs := map[string][]queryGroupDef{}
 
 	for _, i := range queryObjects {
@@ -722,12 +721,12 @@ func parseQueryDefinitions(queryObjects []dirObjPair, queryTag string, modelDefs
 		if structType.Incomplete {
 			return nil, kerrors.WithMsg(nil, "Unexpected incomplete struct definition")
 		}
-		astFields, err := findFields(queryTag, structType, fset)
+		astFields, err := findFields(modelTag, structType, fset)
 		if err != nil {
 			return nil, err
 		}
 		if len(astFields) == 0 {
-			return nil, kerrors.WithKind(nil, ErrInvalidFile, "No query fields found on struct")
+			return nil, kerrors.WithKind(nil, ErrInvalidModel, "No query fields found on struct")
 		}
 		fields, err := parseQueryFields(astFields, mdef.fieldMap)
 		if err != nil {
@@ -744,7 +743,7 @@ func parseQueryDefinitions(queryObjects []dirObjPair, queryTag string, modelDefs
 				return nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to parse query kind for %s on struct %s", j.Name, structName))
 			}
 			if j.Name == "" {
-				return nil, kerrors.WithMsg(err, fmt.Sprintf("Query name missing for kind %s on struct %s", j.Kind, structName))
+				return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Query name missing for kind %s on struct %s", j.Kind, structName))
 			}
 			def := queryDef{
 				Kind: kind,
@@ -814,8 +813,8 @@ func parseQueryDefinitions(queryObjects []dirObjPair, queryTag string, modelDefs
 func parseQueryFields(astfields []astField, fieldMap map[string]modelField) ([]queryField, error) {
 	var fields []queryField
 	for n, i := range astfields {
-		dbName := i.Tags
-		if len(dbName) < 1 {
+		dbName, _, _ := strings.Cut(i.Tags, ",")
+		if dbName == "" {
 			return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Query field opt must be dbname for field %s", i.Ident))
 		}
 		if mfield, ok := fieldMap[dbName]; !ok || i.GoType != mfield.GoType {
@@ -828,9 +827,6 @@ func parseQueryFields(astfields []astField, fieldMap map[string]modelField) ([]q
 			Num:    n + 1,
 		}
 		fields = append(fields, f)
-	}
-	if len(fields) == 0 {
-		return nil, kerrors.WithKind(nil, ErrInvalidModel, "Query does not contain a selected field")
 	}
 	return fields, nil
 }
@@ -939,7 +935,7 @@ func findFields(tagName string, structType *ast.StructType, fset *token.FileSet)
 
 		ident := field.Names[0].Name
 
-		goType := bytes.Buffer{}
+		var goType bytes.Buffer
 		if err := printer.Fprint(&goType, fset, field.Type); err != nil {
 			return nil, kerrors.WithMsg(err, fmt.Sprintf("Failed to print go struct field type for field %s", ident))
 		}
