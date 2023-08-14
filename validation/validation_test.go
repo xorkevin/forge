@@ -138,7 +138,7 @@ func (r reqGetUsers) valid() error {
 					ModTime: now,
 				},
 			},
-			Err: ErrorEnv{},
+			Err: ErrEnv,
 		},
 		{
 			Name: "errors on no validations",
@@ -150,7 +150,7 @@ func (r reqGetUsers) valid() error {
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidFile{},
+			Err: ErrInvalidFile,
 		},
 		{
 			Name: "errors on validation directive on non-typedef",
@@ -167,7 +167,7 @@ const (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidFile{},
+			Err: ErrInvalidFile,
 		},
 		{
 			Name: "errors on validation tag on multiple fields",
@@ -186,7 +186,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidValidator{},
+			Err: ErrInvalidValidator,
 		},
 		{
 			Name: "errors on malformed validation tag",
@@ -205,7 +205,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidValidator{},
+			Err: ErrInvalidValidator,
 		},
 		{
 			Name: "errors on invalid validation tag value",
@@ -224,7 +224,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidValidator{},
+			Err: ErrInvalidValidator,
 		},
 		{
 			Name: "errors on no validation tags",
@@ -243,7 +243,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidFile{},
+			Err: ErrInvalidValidator,
 		},
 		{
 			Name: "errors on validation directive on non-struct",
@@ -260,7 +260,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidFile{},
+			Err: ErrInvalidFile,
 		},
 		{
 			Name: "errors on validation directive on type alias",
@@ -277,7 +277,7 @@ type (
 					ModTime: now,
 				},
 			},
-			Err: ErrorInvalidFile{},
+			Err: ErrInvalidFile,
 		},
 	} {
 		tc := tc
@@ -413,4 +413,31 @@ type (
 		})
 		assert.ErrorIs(err, gopackages.ErrorConflictingPackage{})
 	})
+}
+
+func TestError(t *testing.T) {
+	t.Parallel()
+
+	assert := require.New(t)
+
+	for _, tc := range []struct {
+		Err    error
+		String string
+	}{
+		{
+			Err:    ErrEnv,
+			String: "Invalid execution environment",
+		},
+		{
+			Err:    ErrInvalidFile,
+			String: "Invalid file",
+		},
+		{
+			Err:    ErrInvalidValidator,
+			String: "Invalid validator",
+		},
+	} {
+		tc := tc
+		assert.Equal(tc.String, tc.Err.Error())
+	}
 }

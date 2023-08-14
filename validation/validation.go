@@ -24,24 +24,30 @@ const (
 	generatedFileFlag = os.O_WRONLY | os.O_TRUNC | os.O_CREATE
 )
 
-type (
-	// ErrorEnv is returned when validation is run outside of go generate
-	ErrorEnv struct{}
-	// ErrorInvalidFile is returned when parsing an invalid validation file
-	ErrorInvalidFile struct{}
-	// ErrorInvalidValidator is returned when parsing a validator with invalid syntax
-	ErrorInvalidValidator struct{}
+var (
+	// ErrEnv is returned when validation is run outside of go generate
+	ErrEnv errEnv
+	// ErrInvalidFile is returned when parsing an invalid validation file
+	ErrInvalidFile errInvalidFile
+	// ErrInvalidValidator is returned when parsing a validator with invalid syntax
+	ErrInvalidValidator errInvalidValidator
 )
 
-func (e ErrorEnv) Error() string {
+type (
+	errEnv              struct{}
+	errInvalidFile      struct{}
+	errInvalidValidator struct{}
+)
+
+func (e errEnv) Error() string {
 	return "Invalid execution environment"
 }
 
-func (e ErrorInvalidFile) Error() string {
+func (e errInvalidFile) Error() string {
 	return "Invalid file"
 }
 
-func (e ErrorInvalidValidator) Error() string {
+func (e errInvalidValidator) Error() string {
 	return "Invalid validator"
 }
 
@@ -79,10 +85,6 @@ type (
 	}
 )
 
-func (f validationField) String() string {
-	return f.Ident + ":" + f.Key
-}
-
 type (
 	Opts struct {
 		Output      string
@@ -105,11 +107,11 @@ type (
 func Execute(log klog.Logger, version string, opts Opts) error {
 	gopackage := os.Getenv("GOPACKAGE")
 	if len(gopackage) == 0 {
-		return kerrors.WithKind(nil, ErrorEnv{}, "Environment variable GOPACKAGE not provided by go generate")
+		return kerrors.WithKind(nil, ErrEnv, "Environment variable GOPACKAGE not provided by go generate")
 	}
 	gofile := os.Getenv("GOFILE")
 	if len(gofile) == 0 {
-		return kerrors.WithKind(nil, ErrorEnv{}, "Environment variable GOFILE not provided by go generate")
+		return kerrors.WithKind(nil, ErrEnv, "Environment variable GOFILE not provided by go generate")
 	}
 
 	ctx := klog.CtxWithAttrs(context.Background(),
@@ -146,12 +148,12 @@ func Generate(ctx context.Context, log klog.Logger, outputfs fs.FS, inputfs fs.F
 		return err
 	}
 	if astpkg.Name != env.GoPackage {
-		return kerrors.WithKind(nil, ErrorEnv{}, "Environment variable GOPACKAGE does not match directory package")
+		return kerrors.WithKind(nil, ErrEnv, "Environment variable GOPACKAGE does not match directory package")
 	}
 
 	directiveObjects := gopackages.FindDirectives(astpkg, []string{opts.Directive})
 	if len(directiveObjects) == 0 {
-		return kerrors.WithKind(nil, ErrorInvalidFile{}, "No validations found")
+		return kerrors.WithKind(nil, ErrInvalidFile, "No validations found")
 	}
 
 	validations, err := parseDefinitions(directiveObjects, opts.Tag)
@@ -218,7 +220,7 @@ func parseDefinitions(directiveObjects []gopackages.DirectiveObject, validateTag
 	var validationDefs []validationDef
 	for _, i := range directiveObjects {
 		if i.Kind != gopackages.ObjKindDeclType {
-			return nil, kerrors.WithKind(nil, ErrorInvalidFile{}, "Validation directive used on non-type declaration")
+			return nil, kerrors.WithKind(nil, ErrInvalidFile, "Validation directive used on non-type declaration")
 		}
 		typeSpec, ok := i.Obj.(*ast.TypeSpec)
 		if !ok {
@@ -227,7 +229,7 @@ func parseDefinitions(directiveObjects []gopackages.DirectiveObject, validateTag
 		structName := typeSpec.Name.Name
 		structType, ok := typeSpec.Type.(*ast.StructType)
 		if !ok {
-			return nil, kerrors.WithKind(nil, ErrorInvalidFile{}, "Validation directive used on non-struct type declaration")
+			return nil, kerrors.WithKind(nil, ErrInvalidFile, "Validation directive used on non-struct type declaration")
 		}
 		if structType.Incomplete {
 			return nil, kerrors.WithMsg(nil, "Unexpected incomplete struct definition")
@@ -237,7 +239,7 @@ func parseDefinitions(directiveObjects []gopackages.DirectiveObject, validateTag
 			return nil, err
 		}
 		if len(astFields) == 0 {
-			return nil, kerrors.WithKind(nil, ErrorInvalidFile{}, "No field validations found on struct")
+			return nil, kerrors.WithKind(nil, ErrInvalidValidator, "No field validations found on struct")
 		}
 		fields, err := parseValidationFields(astFields)
 		if err != nil {
@@ -265,7 +267,7 @@ func findFields(tagName string, structType *ast.StructType) ([]astField, error) 
 		}
 
 		if len(field.Names) != 1 {
-			return nil, kerrors.WithKind(nil, ErrorInvalidValidator{}, "Only one field allowed per tag")
+			return nil, kerrors.WithKind(nil, ErrInvalidValidator, "Only one field allowed per tag")
 		}
 
 		m := astField{
@@ -283,11 +285,11 @@ func parseValidationFields(astFields []astField) ([]validationField, error) {
 	for _, i := range astFields {
 		fieldname, tag, _ := strings.Cut(i.Tags, ",")
 		if fieldname == "" {
-			return nil, kerrors.WithKind(nil, ErrorInvalidValidator{}, fmt.Sprintf("Field tag must be fieldname[,flag] for field %s", i.Ident))
+			return nil, kerrors.WithKind(nil, ErrInvalidValidator, fmt.Sprintf("Field tag must be fieldname[,flag] for field %s", i.Ident))
 		}
 		f := validationField{
 			Ident: i.Ident,
-			Key:   strings.Title(fieldname),
+			Key:   strings.ToUpper(fieldname[:1]) + fieldname[1:],
 			Has:   false,
 			Opt:   false,
 		}
@@ -322,6 +324,6 @@ func parseFlag(flag string) (int, error) {
 	case "opt":
 		return flagOpt, nil
 	default:
-		return flagUnknown, kerrors.WithKind(nil, ErrorInvalidValidator{}, fmt.Sprintf("Illegal flag %s", flag))
+		return flagUnknown, kerrors.WithKind(nil, ErrInvalidValidator, fmt.Sprintf("Illegal flag %s", flag))
 	}
 }

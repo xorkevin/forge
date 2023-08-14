@@ -244,11 +244,11 @@ type (
 // Execute runs forge model generation
 func Execute(log klog.Logger, version string, opts Opts) error {
 	gopackage := os.Getenv("GOPACKAGE")
-	if len(gopackage) == 0 {
+	if gopackage == "" {
 		return kerrors.WithKind(nil, ErrEnv, "Environment variable GOPACKAGE not provided by go generate")
 	}
 	gofile := os.Getenv("GOFILE")
-	if len(gofile) == 0 {
+	if gofile == "" {
 		return kerrors.WithKind(nil, ErrEnv, "Environment variable GOFILE not provided by go generate")
 	}
 
