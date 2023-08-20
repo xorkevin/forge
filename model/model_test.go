@@ -31,138 +31,140 @@ func TestGenerate(t *testing.T) {
 				"model.json": &fstest.MapFile{
 					Data: []byte(`
 {
-  "user": {
-    "model": {
-      "setup": "UNIQUE (first_name)",
-      "constraints": [
-        {
-          "kind": "UNIQUE",
-          "columns": ["username", "first_name"]
-        }
-      ],
-      "indicies": [
-        {
-          "columns": ["first_name", "username"]
-        }
-      ]
+  "models": {
+    "user": {
+      "model": {
+        "setup": "UNIQUE (first_name)",
+        "constraints": [
+          {
+            "kind": "UNIQUE",
+            "columns": ["username", "first_name"]
+          }
+        ],
+        "indicies": [
+          {
+            "columns": ["first_name", "username"]
+          }
+        ]
+      },
+      "queries": {
+        "Model": [
+          {
+            "kind": "getoneeq",
+            "name": "ByID",
+            "conditions": [
+              {"col": "userid"}
+            ]
+          },
+          {
+            "kind": "deleq",
+            "name": "ByID",
+            "conditions": [
+              {"col": "userid"}
+            ]
+          },
+          {
+            "kind": "getoneeq",
+            "name": "ByUsername",
+            "conditions": [
+              {"col": "username"}
+            ]
+          }
+        ],
+        "userProps": [
+          {
+            "kind": "updeq",
+            "name": "ByID",
+            "conditions": [
+              {"col": "userid"}
+            ]
+          }
+        ],
+        "usernameProps": [
+          {
+            "kind": "updeq",
+            "name": "ByID",
+            "conditions": [
+              {"col": "userid"}
+            ]
+          }
+        ],
+        "Info": [
+          {
+            "kind": "getgroup",
+            "name": "All",
+            "order": [
+              {"col": "userid", "dir": "DESC"}
+            ]
+          },
+          {
+            "kind": "getgroupeq",
+            "name": "ByIDs",
+            "conditions": [
+              {"col": "userid", "cond": "in"}
+            ],
+            "order": [
+              {"col": "userid"}
+            ]
+          },
+          {
+            "kind": "getgroupeq",
+            "name": "LikeUsername",
+            "conditions": [
+              {"col": "username", "cond": "like"}
+            ],
+            "order": [
+              {"col": "username"}
+            ]
+          }
+        ],
+        "InfoAgain": [
+          {
+            "kind": "getgroup",
+            "name": "All",
+            "order": [
+              {"col": "userid"}
+            ]
+          },
+          {
+            "kind": "getgroupeq",
+            "name": "ByIDs",
+            "conditions": [
+              {"col": "userid", "cond": "in"}
+            ],
+            "order": [
+              {"col": "userid"}
+            ]
+          },
+          {
+            "kind": "getgroupeq",
+            "name": "LikeUsername",
+            "conditions": [
+              {"col": "username", "cond": "like"}
+            ],
+            "order": [
+              {"col": "username"}
+            ]
+          }
+        ]
+      }
     },
-    "queries": {
-      "Model": [
-        {
-          "kind": "getoneeq",
-          "name": "ByID",
-          "conditions": [
-            {"col": "userid"}
-          ]
-        },
-        {
-          "kind": "deleq",
-          "name": "ByID",
-          "conditions": [
-            {"col": "userid"}
-          ]
-        },
-        {
-          "kind": "getoneeq",
-          "name": "ByUsername",
-          "conditions": [
-            {"col": "username"}
-          ]
-        }
-      ],
-      "userProps": [
-        {
-          "kind": "updeq",
-          "name": "ByID",
-          "conditions": [
-            {"col": "userid"}
-          ]
-        }
-      ],
-      "usernameProps": [
-        {
-          "kind": "updeq",
-          "name": "ByID",
-          "conditions": [
-            {"col": "userid"}
-          ]
-        }
-      ],
-      "Info": [
-        {
-          "kind": "getgroup",
-          "name": "All",
-          "order": [
-            {"col": "userid", "dir": "DESC"}
-          ]
-        },
-        {
-          "kind": "getgroupeq",
-          "name": "ByIDs",
-          "conditions": [
-            {"col": "userid", "cond": "in"}
-          ],
-          "order": [
-            {"col": "userid"}
-          ]
-        },
-        {
-          "kind": "getgroupeq",
-          "name": "LikeUsername",
-          "conditions": [
-            {"col": "username", "cond": "like"}
-          ],
-          "order": [
-            {"col": "username"}
-          ]
-        }
-      ],
-      "InfoAgain": [
-        {
-          "kind": "getgroup",
-          "name": "All",
-          "order": [
-            {"col": "userid"}
-          ]
-        },
-        {
-          "kind": "getgroupeq",
-          "name": "ByIDs",
-          "conditions": [
-            {"col": "userid", "cond": "in"}
-          ],
-          "order": [
-            {"col": "userid"}
-          ]
-        },
-        {
-          "kind": "getgroupeq",
-          "name": "LikeUsername",
-          "conditions": [
-            {"col": "username", "cond": "like"}
-          ],
-          "order": [
-            {"col": "username"}
-          ]
-        }
-      ]
-    }
-  },
-  "sm": {
-    "queries": {
-      "SM": [
-        {
-          "kind": "getoneeq",
-          "name": "ManyCond",
-          "conditions": [
-            {"col": "userid", "cond": "neq"},
-            {"col": "username", "cond": "lt"},
-            {"col": "first_name", "cond": "leq"},
-            {"col": "last_name", "cond": "gt"},
-            {"col": "email", "cond": "geq"}
-          ]
-        }
-      ]
+    "sm": {
+      "queries": {
+        "SM": [
+          {
+            "kind": "getoneeq",
+            "name": "ManyCond",
+            "conditions": [
+              {"col": "userid", "cond": "neq"},
+              {"col": "username", "cond": "lt"},
+              {"col": "first_name", "cond": "leq"},
+              {"col": "last_name", "cond": "gt"},
+              {"col": "email", "cond": "geq"}
+            ]
+          }
+        ]
+      }
     }
   }
 }
@@ -658,13 +660,15 @@ type (
 				"model.json": &fstest.MapFile{
 					Data: []byte(`
 {
-  "user": {
-    "model": {
-      "indicies": [
-        {
-          "columns": ["bogus", "userid"]
-        }
-      ]
+  "models": {
+    "user": {
+      "model": {
+        "indicies": [
+          {
+            "columns": ["bogus", "userid"]
+          }
+        ]
+      }
     }
   }
 }
@@ -694,13 +698,15 @@ type (
 				"model.json": &fstest.MapFile{
 					Data: []byte(`
 {
-  "user": {
-    "model": {
-      "indicies": [
-        {
-          "columns": []
-        }
-      ]
+  "models": {
+    "user": {
+      "model": {
+        "indicies": [
+          {
+            "columns": []
+          }
+        ]
+      }
     }
   }
 }
@@ -730,14 +736,16 @@ type (
 				"model.json": &fstest.MapFile{
 					Data: []byte(`
 {
-  "user": {
-    "model": {
-      "constraints": [
-        {
-          "kind": "",
-          "columns": ["userid"]
-        }
-      ]
+  "models": {
+    "user": {
+      "model": {
+        "constraints": [
+          {
+            "kind": "",
+            "columns": ["userid"]
+          }
+        ]
+      }
     }
   }
 }
@@ -767,14 +775,16 @@ type (
 				"model.json": &fstest.MapFile{
 					Data: []byte(`
 {
-  "user": {
-    "model": {
-      "constraints": [
-        {
-          "kind": "UNIQUE",
-          "columns": []
-        }
-      ]
+  "models": {
+    "user": {
+      "model": {
+        "constraints": [
+          {
+            "kind": "UNIQUE",
+            "columns": []
+          }
+        ]
+      }
     }
   }
 }
@@ -804,14 +814,16 @@ type (
 				"model.json": &fstest.MapFile{
 					Data: []byte(`
 {
-  "user": {
-    "model": {
-      "constraints": [
-        {
-          "kind": "UNIQUE",
-          "columns": ["bogus", "userid"]
-        }
-      ]
+  "models": {
+    "user": {
+      "model": {
+        "constraints": [
+          {
+            "kind": "UNIQUE",
+            "columns": ["bogus", "userid"]
+          }
+        ]
+      }
     }
   }
 }
@@ -1062,17 +1074,19 @@ type (
 				"model.json": &fstest.MapFile{
 					Data: []byte(`
 {
-  "user": {
-    "queries": {
-      "Model": [
-        {
-          "kind": "getoneeq",
-          "name": "",
-          "conditions": [
-            {"col": "userid"}
-          ]
-        }
-      ]
+  "models": {
+    "user": {
+      "queries": {
+        "Model": [
+          {
+            "kind": "getoneeq",
+            "name": "",
+            "conditions": [
+              {"col": "userid"}
+            ]
+          }
+        ]
+      }
     }
   }
 }
@@ -1103,17 +1117,19 @@ type (
 				"model.json": &fstest.MapFile{
 					Data: []byte(`
 {
-  "user": {
-    "queries": {
-      "Model": [
-        {
-          "kind": "bogus",
-          "name": "ByID",
-          "conditions": [
-            {"col": "userid"}
-          ]
-        }
-      ]
+  "models": {
+    "user": {
+      "queries": {
+        "Model": [
+          {
+            "kind": "bogus",
+            "name": "ByID",
+            "conditions": [
+              {"col": "userid"}
+            ]
+          }
+        ]
+      }
     }
   }
 }
@@ -1144,14 +1160,16 @@ type (
 				"model.json": &fstest.MapFile{
 					Data: []byte(`
 {
-  "user": {
-    "queries": {
-      "Model": [
-        {
-          "kind": "getoneeq",
-          "name": "ByID"
-        }
-      ]
+  "models": {
+    "user": {
+      "queries": {
+        "Model": [
+          {
+            "kind": "getoneeq",
+            "name": "ByID"
+          }
+        ]
+      }
     }
   }
 }
@@ -1182,17 +1200,19 @@ type (
 				"model.json": &fstest.MapFile{
 					Data: []byte(`
 {
-  "user": {
-    "queries": {
-      "Model": [
-        {
-          "kind": "getgroup",
-          "name": "ByID",
-          "conditions": [
-            {"col": "userid"}
-          ]
-        }
-      ]
+  "models": {
+    "user": {
+      "queries": {
+        "Model": [
+          {
+            "kind": "getgroup",
+            "name": "ByID",
+            "conditions": [
+              {"col": "userid"}
+            ]
+          }
+        ]
+      }
     }
   }
 }
@@ -1223,17 +1243,19 @@ type (
 				"model.json": &fstest.MapFile{
 					Data: []byte(`
 {
-  "user": {
-    "queries": {
-      "Model": [
-        {
-          "kind": "getoneeq",
-          "name": "ByID",
-          "conditions": [
-            {"col": "userid", "cond": "bogus"}
-          ]
-        }
-      ]
+  "models": {
+    "user": {
+      "queries": {
+        "Model": [
+          {
+            "kind": "getoneeq",
+            "name": "ByID",
+            "conditions": [
+              {"col": "userid", "cond": "bogus"}
+            ]
+          }
+        ]
+      }
     }
   }
 }
@@ -1264,17 +1286,19 @@ type (
 				"model.json": &fstest.MapFile{
 					Data: []byte(`
 {
-  "user": {
-    "queries": {
-      "Model": [
-        {
-          "kind": "getoneeq",
-          "name": "ByID",
-          "conditions": [
-            {"col": "bogus"}
-          ]
-        }
-      ]
+  "models": {
+    "user": {
+      "queries": {
+        "Model": [
+          {
+            "kind": "getoneeq",
+            "name": "ByID",
+            "conditions": [
+              {"col": "bogus"}
+            ]
+          }
+        ]
+      }
     }
   }
 }
@@ -1305,20 +1329,22 @@ type (
 				"model.json": &fstest.MapFile{
 					Data: []byte(`
 {
-  "user": {
-    "queries": {
-      "Model": [
-        {
-          "kind": "getoneeq",
-          "name": "ByID",
-          "conditions": [
-            {"col": "userid"}
-          ],
-          "order": [
-            {"col": "userid"}
-          ]
-        }
-      ]
+  "models": {
+    "user": {
+      "queries": {
+        "Model": [
+          {
+            "kind": "getoneeq",
+            "name": "ByID",
+            "conditions": [
+              {"col": "userid"}
+            ],
+            "order": [
+              {"col": "userid"}
+            ]
+          }
+        ]
+      }
     }
   }
 }
@@ -1349,17 +1375,19 @@ type (
 				"model.json": &fstest.MapFile{
 					Data: []byte(`
 {
-  "user": {
-    "queries": {
-      "Model": [
-        {
-          "kind": "getgroup",
-          "name": "All",
-          "order": [
-            {"col": "bogus"}
-          ]
-        }
-      ]
+  "models": {
+    "user": {
+      "queries": {
+        "Model": [
+          {
+            "kind": "getgroup",
+            "name": "All",
+            "order": [
+              {"col": "bogus"}
+            ]
+          }
+        ]
+      }
     }
   }
 }
