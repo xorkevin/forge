@@ -4,8 +4,11 @@
   "title": "Forge model config",
   "description": "Forge model configuration",
   "type": "object",
+  "properties": {
+    "$schema": true
+  },
   "patternProperties": {
-    "^.+$": {"$ref": "#/$defs/model"}
+    "^[A-Za-z_].*$": {"$ref": "#/$defs/model"}
   },
   "additionalProperties": false,
   "$defs": {
@@ -16,7 +19,7 @@
         "queries": {
           "type": "object",
           "patternProperties": {
-            "^.+$": {"$ref": "#/$defs/querydefs"}
+            "^[A-Za-z_].*$": {"$ref": "#/$defs/querydefs"}
           },
           "additionalProperties": false
         }
