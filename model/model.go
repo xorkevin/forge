@@ -112,6 +112,10 @@ type (
 		Queries map[string][]queryOpts `json:"queries"`
 	}
 
+	modelSchema struct {
+		Models map[string]modelConfig `json:"models"`
+	}
+
 	modelDef struct {
 		Prefix      string
 		Ident       string
@@ -265,7 +269,7 @@ func Execute(log klog.Logger, version string, opts Opts) error {
 func Generate(ctx context.Context, log klog.Logger, outputfs fs.FS, inputfs fs.FS, version string, opts Opts, env ExecEnv) (retErr error) {
 	l := klog.NewLevelLogger(log)
 
-	var schema map[string]modelConfig
+	var schema modelSchema
 	if opts.Schema != "" {
 		if f, err := fs.ReadFile(inputfs, opts.Schema); err != nil {
 			if !errors.Is(err, fs.ErrNotExist) {
@@ -584,7 +588,7 @@ func (q *queryDef) genQueryOrderSQL() queryOrderSQLStrings {
 	}
 }
 
-func parseModelDefinitions(modelObjects []dirObjPair, modelTag string, fset *token.FileSet, schema map[string]modelConfig) ([]modelDef, error) {
+func parseModelDefinitions(modelObjects []dirObjPair, modelTag string, fset *token.FileSet, schema modelSchema) ([]modelDef, error) {
 	modelDefs := make([]modelDef, 0, len(modelObjects))
 
 	for _, i := range modelObjects {
@@ -592,7 +596,7 @@ func parseModelDefinitions(modelObjects []dirObjPair, modelTag string, fset *tok
 		if prefix == "" {
 			return nil, kerrors.WithKind(nil, ErrInvalidFile, "Model directive without prefix")
 		}
-		opts := schema[prefix]
+		opts := schema.Models[prefix]
 		if i.Obj.Kind != gopackages.ObjKindDeclType {
 			return nil, kerrors.WithKind(nil, ErrInvalidFile, "Model directive used on non-type declaration")
 		}
@@ -693,7 +697,7 @@ func parseModelFields(astfields []astField) ([]modelField, map[string]modelField
 	return fields, seenFields, nil
 }
 
-func parseQueryDefinitions(queryObjects []dirObjPair, modelTag string, modelDefs map[string]modelDef, fset *token.FileSet, schema map[string]modelConfig) (map[string][]queryGroupDef, error) {
+func parseQueryDefinitions(queryObjects []dirObjPair, modelTag string, modelDefs map[string]modelDef, fset *token.FileSet, schema modelSchema) (map[string][]queryGroupDef, error) {
 	queryGroupDefs := map[string][]queryGroupDef{}
 
 	for _, i := range queryObjects {
@@ -731,7 +735,7 @@ func parseQueryDefinitions(queryObjects []dirObjPair, modelTag string, modelDefs
 		if err != nil {
 			return nil, kerrors.WithMsg(err, fmt.Sprintf("Invalid query fields for struct %s", structName))
 		}
-		opts := schema[prefix].Queries[structName]
+		opts := schema.Models[prefix].Queries[structName]
 		if len(opts) == 0 {
 			return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Query struct %s missing queries", structName))
 		}

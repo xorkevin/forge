@@ -5,12 +5,14 @@
   "description": "Forge model configuration",
   "type": "object",
   "properties": {
-    "$schema": true
+    "models": {
+      "type": "object",
+      "patternProperties": {
+        "^.+$": {"$ref": "#/$defs/model"}
+      },
+      "additionalProperties": false
+    }
   },
-  "patternProperties": {
-    "^[A-Za-z_].*$": {"$ref": "#/$defs/model"}
-  },
-  "additionalProperties": false,
   "$defs": {
     "model": {
       "type": "object",
@@ -19,7 +21,7 @@
         "queries": {
           "type": "object",
           "patternProperties": {
-            "^[A-Za-z_].*$": {"$ref": "#/$defs/querydefs"}
+            "^.+$": {"$ref": "#/$defs/querydefs"}
           },
           "additionalProperties": false
         }
