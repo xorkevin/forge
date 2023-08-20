@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xorkevin.dev/forge/schema/modelschema.json",
+  "title": "Forge model config",
+  "description": "Forge model configuration",
+  "type": "object",
+  "patternProperties": {
+    "^.+$": {"$ref": "#/$defs/model"}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "model": {
+      "type": "object",
+      "properties": {
+        "model": {"$ref": "#/$defs/modeldef"},
+        "queries": {
+          "type": "object",
+          "patternProperties": {
+            "^.+$": {"$ref": "#/$defs/querydefs"}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "modeldef": {
+      "type": "object",
+      "properties": {
+        "setup": {"type": "string"},
+        "constraints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {"type": "string", "minLength": 1},
+              "columns": {"$ref": "#/$defs/modelcols"}
+            },
+            "additionalProperties": false,
+            "required": ["kind", "columns"]
+          }
+        },
+        "indicies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "columns": {"$ref": "#/$defs/modelcols"}
+            },
+            "additionalProperties": false,
+            "required": ["columns"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "modelcols": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "querydefs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["getoneeq", "getgroup", "getgroupeq", "updeq", "deleq"]
+          },
+          "name": {"type": "string", "minLength": 1},
+          "conditions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "col": {"type": "string", "minLength": 1},
+                "cond": {
+                  "type": "string",
+                  "enum": ["eq", "neq", "lt", "leq", "gt", "geq", "in", "like"]
+                }
+              },
+              "additionalProperties": false,
+              "required": ["col"]
+            },
+            "minItems": 1
+          },
+          "order": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "col": {"type": "string", "minLength": 1},
+                "dir": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false,
+              "required": ["col"]
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": ["getoneeq", "getgroupeq", "updeq", "deleq"]
+                }
+              },
+              "required": ["kind"]
+            },
+            "then": {
+              "required": ["conditions"]
+            }
+          },
+          {
+            "if": {
+              "not": {
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": ["getoneeq", "getgroupeq", "updeq", "deleq"]
+                  }
+                },
+                "required": ["kind"]
+              }
+            },
+            "then": {
+              "properties": {
+                "conditions": false
+              }
+            }
+          },
+          {
+            "if": {
+              "not": {
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": ["getgroup", "getgroupeq"]
+                  }
+                },
+                "required": ["kind"]
+              }
+            },
+            "then": {
+              "properties": {
+                "order": false
+              }
+            }
+          }
+        ],
+        "additionalProperties": false,
+        "required": ["kind", "name"]
+      }
+    }
+  },
+  "examples": [
+    {
+      "modelPrefix": {
+        "model": {
+          "setup": "optional text appended to the end of the model setup query",
+          "constraints": [{"kind": "PRIMARY KEY", "columns": ["col1", "etc"]}],
+          "indicies": [{"columns": ["col1", "etc"]}]
+        },
+        "queries": {
+          "StructName": [
+            {
+              "kind": "getgroupeq",
+              "name": "QueryName",
+              "conditions": [{"col": "col1", "cond": "eq"}],
+              "order": [{"col": "col1", "dir": "ASC"}]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
