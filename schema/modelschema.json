@@ -38,7 +38,14 @@
             "type": "object",
             "properties": {
               "kind": {"type": "string", "minLength": 1},
-              "columns": {"$ref": "#/$defs/modelcols"}
+              "columns": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              }
             },
             "additionalProperties": false,
             "required": ["kind", "columns"]
@@ -49,7 +56,20 @@
           "items": {
             "type": "object",
             "properties": {
-              "columns": {"$ref": "#/$defs/modelcols"}
+              "name": {"type": "string", "minLength": 1},
+              "columns": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "col": {"type": "string", "minLength": 1},
+                    "dir": {"type": "string"}
+                  },
+                  "additionalProperties": false,
+                  "required": ["col"]
+                },
+                "minItems": 1
+              }
             },
             "additionalProperties": false,
             "required": ["columns"]
@@ -57,14 +77,6 @@
         }
       },
       "additionalProperties": false
-    },
-    "modelcols": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "minLength": 1
-      },
-      "minItems": 1
     },
     "querydefs": {
       "type": "array",
@@ -98,9 +110,7 @@
               "type": "object",
               "properties": {
                 "col": {"type": "string", "minLength": 1},
-                "dir": {
-                  "type": "string"
-                }
+                "dir": {"type": "string"}
               },
               "additionalProperties": false,
               "required": ["col"]

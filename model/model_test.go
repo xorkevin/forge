@@ -43,7 +43,8 @@ func TestGenerate(t *testing.T) {
         ],
         "indicies": [
           {
-            "columns": ["first_name", "username"]
+            "name": "names",
+            "columns": [{"col": "first_name"}, {"col": "username", "dir": "DESC"}]
           }
         ]
       },
@@ -269,7 +270,7 @@ func (t *userModelTable) Setup(ctx context.Context, d sqldb.Executor) error {
 	if err != nil {
 		return err
 	}
-	_, err = d.ExecContext(ctx, "CREATE INDEX IF NOT EXISTS "+t.TableName+"_first_name__username_index ON "+t.TableName+" (first_name, username);")
+	_, err = d.ExecContext(ctx, "CREATE INDEX IF NOT EXISTS "+t.TableName+"_names_index ON "+t.TableName+" (first_name, username DESC);")
 	if err != nil {
 		return err
 	}
@@ -665,7 +666,7 @@ type (
       "model": {
         "indicies": [
           {
-            "columns": ["bogus", "userid"]
+            "columns": [{"col": "bogus"}, {"col": "userid"}]
           }
         ]
       }

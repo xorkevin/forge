@@ -75,8 +75,14 @@ type (
 		Tags   string
 	}
 
+	modelIndexOrderOpt struct {
+		Col string `json:"col"`
+		Dir string `json:"dir"`
+	}
+
 	modelIndexOpts struct {
-		Columns []string `json:"columns"`
+		Name    string               `json:"name"`
+		Columns []modelIndexOrderOpt `json:"columns"`
 	}
 
 	modelConstraintOpts struct {
@@ -121,7 +127,7 @@ type (
 		Ident       string
 		Fields      []modelField
 		Constraints []modelConstraint
-		Indicies    [][]modelField
+		Indicies    []modelIndexDef
 		opts        modelOpts
 		fieldMap    map[string]modelField
 	}
@@ -137,6 +143,16 @@ type (
 	modelConstraint struct {
 		Kind    string
 		Columns []modelField
+	}
+
+	modelIndexDef struct {
+		Name    string
+		Columns []modelIndexColumn
+	}
+
+	modelIndexColumn struct {
+		Field modelField
+		Dir   string
 	}
 
 	queryGroupDef struct {
@@ -475,12 +491,16 @@ func (m *modelDef) genModelSQL() modelSQLStrings {
 
 	sqlIndicies := make([]modelIndex, 0, len(m.Indicies))
 	for _, i := range m.Indicies {
-		k := make([]string, 0, len(i))
-		for _, j := range i {
-			k = append(k, j.DBName)
+		k := make([]string, 0, len(i.Columns))
+		for _, j := range i.Columns {
+			if j.Dir == "" {
+				k = append(k, j.Field.DBName)
+			} else {
+				k = append(k, fmt.Sprintf("%s %s", j.Field.DBName, j.Dir))
+			}
 		}
 		sqlIndicies = append(sqlIndicies, modelIndex{
-			Name:    strings.Join(k, "__"),
+			Name:    i.Name,
 			Columns: strings.Join(k, ", "),
 		})
 	}
@@ -644,20 +664,29 @@ func parseModelDefinitions(modelObjects []dirObjPair, modelTag string, fset *tok
 				Columns: fields,
 			})
 		}
-		indicies := make([][]modelField, 0, len(opts.Model.Indicies))
+		indicies := make([]modelIndexDef, 0, len(opts.Model.Indicies))
 		for _, i := range opts.Model.Indicies {
+			if i.Name == "" {
+				return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("No name for index of struct %s", structName))
+			}
 			if len(i.Columns) == 0 {
 				return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("No columns for index of struct %s", structName))
 			}
-			fields := make([]modelField, 0, len(i.Columns))
+			columns := make([]modelIndexColumn, 0, len(i.Columns))
 			for _, j := range i.Columns {
-				f, ok := fieldMap[j]
+				f, ok := fieldMap[j.Col]
 				if !ok {
 					return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("Unknown field %s for index of struct %s", j, structName))
 				}
-				fields = append(fields, f)
+				columns = append(columns, modelIndexColumn{
+					Field: f,
+					Dir:   j.Dir,
+				})
 			}
-			indicies = append(indicies, fields)
+			indicies = append(indicies, modelIndexDef{
+				Name:    i.Name,
+				Columns: columns,
+			})
 		}
 		modelDefs = append(modelDefs, modelDef{
 			Prefix:      prefix,
