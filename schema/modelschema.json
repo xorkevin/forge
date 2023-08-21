@@ -72,7 +72,7 @@
               }
             },
             "additionalProperties": false,
-            "required": ["columns"]
+            "required": ["name", "columns"]
           }
         }
       },
