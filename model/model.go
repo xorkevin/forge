@@ -637,7 +637,7 @@ func parseModelDefinitions(modelObjects []dirObjPair, modelTag string, fset *tok
 			return nil, err
 		}
 		if len(astFields) == 0 {
-			return nil, kerrors.WithKind(nil, ErrInvalidModel, "No model fields found on struct")
+			return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("No model fields found on struct: %s", structName))
 		}
 		modelFields, fieldMap, err := parseModelFields(astFields)
 		if err != nil {
@@ -758,7 +758,7 @@ func parseQueryDefinitions(queryObjects []dirObjPair, modelTag string, modelDefs
 			return nil, err
 		}
 		if len(astFields) == 0 {
-			return nil, kerrors.WithKind(nil, ErrInvalidModel, "No query fields found on struct")
+			return nil, kerrors.WithKind(nil, ErrInvalidModel, fmt.Sprintf("No query fields found on struct: %s", structName))
 		}
 		fields, err := parseQueryFields(astFields, mdef.fieldMap)
 		if err != nil {
