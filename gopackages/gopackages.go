@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"unicode"
 
 	"xorkevin.dev/kerrors"
 )
@@ -126,13 +125,13 @@ func (v *docCommentVisitor) Visit(node ast.Node) ast.Visitor {
 		return v
 	case *ast.Comment:
 		{
-			if !strings.HasPrefix(n.Text, "//") {
+			text, ok := strings.CutPrefix(n.Text, "//")
+			if !ok {
 				return nil
 			}
-			text := strings.TrimPrefix(n.Text, "//")
 			for _, i := range v.sigils {
 				if strings.HasPrefix(text, i) &&
-					(len(text) == len(i) || unicode.IsSpace(rune(text[len(i)]))) {
+					(len(text) == len(i) || text[len(i)] == ' ') {
 					v.dirs = append(v.dirs, DirectiveInstance{
 						Sigil:     i,
 						Directive: strings.TrimSpace(strings.TrimPrefix(text, i)),
