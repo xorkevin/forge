@@ -95,14 +95,15 @@ forge model [flags]
 ### Options
 
 ```
-  -h, --help                     help for model
-      --ignore string            regex for filenames of files that should be ignored
-      --include string           regex for filenames of files that should be included
-      --model-directive string   comment directive of types that are models (default "forge:model")
-      --model-tag string         go struct tag for defining model fields (default "model")
-  -o, --output string            output filename (default "model_gen.go")
-      --query-directive string   comment directive of types that are model queries (default "forge:model:query")
-  -s, --schema string            model schema (default "model.json")
+  -h, --help                        help for model
+      --ignore string               regex for filenames of files that should be ignored
+      --include string              regex for filenames of files that should be included
+      --model-directive string      comment directive of types that are models (default "forge:model")
+      --model-tag string            go struct tag for defining model fields (default "model")
+  -o, --output string               output filename (default "model_gen.go")
+      --placeholder-prefix string   query numeric placeholder prefix (default "$")
+      --query-directive string      comment directive of types that are model queries (default "forge:model:query")
+  -s, --schema string               model schema (default "model.json")
 ```
 
 ### Options inherited from parent commands

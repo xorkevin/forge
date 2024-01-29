@@ -20,7 +20,7 @@ func (t *{{.Prefix}}ModelTable) Get{{.ModelIdent}}{{.Name}}(ctx context.Context,
 	}
 	{{- end }}
 	res := make([]{{.ModelIdent}}, 0, limit)
-	rows, err := d.QueryContext(ctx, "SELECT {{.SQL.DBNames}} FROM "+t.TableName+" WHERE {{.SQLCond.DBCond}}{{with .SQLOrder.DBOrder}} ORDER BY {{.}}{{end}} LIMIT $1 OFFSET $2;", {{if .SQLCond.ArrIdentArgs}}args...{{else}}limit, offset, {{.SQLCond.IdentArgs}}{{end}})
+	rows, err := d.QueryContext(ctx, "SELECT {{.SQL.DBNames}} FROM "+t.TableName+" WHERE {{.SQLCond.DBCond}}{{with .SQLOrder.DBOrder}} ORDER BY {{.}}{{end}} LIMIT {{.PlaceholderPrefix}}1 OFFSET {{.PlaceholderPrefix}}2;", {{if .SQLCond.ArrIdentArgs}}args...{{else}}limit, offset, {{.SQLCond.IdentArgs}}{{end}})
 	if err != nil {
 		return nil, err
 	}

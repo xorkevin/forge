@@ -3,7 +3,7 @@
 all: install
 
 install:
-	CGO_ENABLED=0 go install -trimpath -ldflags "-w -s" .
+	go install -trimpath -ldflags "-w -s" .
 
 TEST_ARGS?=
 TEST_PACKAGE?=./...

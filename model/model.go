@@ -214,12 +214,13 @@ type (
 	}
 
 	queryTemplateData struct {
-		Prefix     string
-		ModelIdent string
-		Name       string
-		SQL        querySQLStrings
-		SQLCond    queryCondSQLStrings
-		SQLOrder   queryOrderSQLStrings
+		PlaceholderPrefix string
+		Prefix            string
+		ModelIdent        string
+		Name              string
+		SQL               querySQLStrings
+		SQLCond           queryCondSQLStrings
+		SQLOrder          queryOrderSQLStrings
 	}
 
 	querySQLStrings struct {
@@ -247,13 +248,14 @@ type (
 
 type (
 	Opts struct {
-		Output         string
-		Schema         string
-		Include        string
-		Ignore         string
-		ModelDirective string
-		QueryDirective string
-		ModelTag       string
+		Output            string
+		Schema            string
+		Include           string
+		Ignore            string
+		ModelDirective    string
+		QueryDirective    string
+		ModelTag          string
+		PlaceholderPrefix string
 	}
 
 	ExecEnv struct {
@@ -414,7 +416,7 @@ func Generate(ctx context.Context, log klog.Logger, outputfs fs.FS, inputfs fs.F
 		tplData := modelTemplateData{
 			Prefix:     i.Prefix,
 			ModelIdent: i.Ident,
-			SQL:        i.genModelSQL(),
+			SQL:        i.genModelSQL(opts.PlaceholderPrefix),
 		}
 		if err := tplmodel.Execute(fwriter, tplData); err != nil {
 			return kerrors.WithMsg(err, fmt.Sprintf("Failed to execute model template for struct: %s", i.Ident))
@@ -423,27 +425,28 @@ func Generate(ctx context.Context, log klog.Logger, outputfs fs.FS, inputfs fs.F
 			qctx := klog.CtxWithAttrs(mctx, klog.AString("query", j.Ident))
 			l.Debug(qctx, "Detected query", klog.AAny("fields", j.Fields))
 
-			querySQLStrings := j.genQuerySQL()
+			querySQLStrings := j.genQuerySQL(opts.PlaceholderPrefix)
 			numFields := len(j.Fields)
 			for _, k := range j.Queries {
 				tplData := queryTemplateData{
-					Prefix:     i.Prefix,
-					ModelIdent: j.Ident,
-					Name:       k.Name,
-					SQL:        querySQLStrings,
+					PlaceholderPrefix: opts.PlaceholderPrefix,
+					Prefix:            i.Prefix,
+					ModelIdent:        j.Ident,
+					Name:              k.Name,
+					SQL:               querySQLStrings,
 				}
 				switch k.Kind {
 				case queryKindGetOneEq:
-					tplData.SQLCond = k.genQueryCondSQL(0)
+					tplData.SQLCond = k.genQueryCondSQL(opts.PlaceholderPrefix, 0)
 				case queryKindGetGroup:
 					tplData.SQLOrder = k.genQueryOrderSQL()
 				case queryKindGetGroupEq:
-					tplData.SQLCond = k.genQueryCondSQL(2)
+					tplData.SQLCond = k.genQueryCondSQL(opts.PlaceholderPrefix, 2)
 					tplData.SQLOrder = k.genQueryOrderSQL()
 				case queryKindUpdEq:
-					tplData.SQLCond = k.genQueryCondSQL(numFields)
+					tplData.SQLCond = k.genQueryCondSQL(opts.PlaceholderPrefix, numFields)
 				case queryKindDelEq:
-					tplData.SQLCond = k.genQueryCondSQL(0)
+					tplData.SQLCond = k.genQueryCondSQL(opts.PlaceholderPrefix, 0)
 				}
 				if err := tplQuery[k.Kind].Execute(fwriter, tplData); err != nil {
 					return kerrors.WithMsg(err, fmt.Sprintf("Failed to execute template for query kind %s on struct %s of model %s", k.Kind, tplData.ModelIdent, tplData.Prefix))
@@ -460,7 +463,7 @@ func Generate(ctx context.Context, log klog.Logger, outputfs fs.FS, inputfs fs.F
 	return nil
 }
 
-func (m *modelDef) genModelSQL() modelSQLStrings {
+func (m *modelDef) genModelSQL(placeholderPrefix string) modelSQLStrings {
 	colNum := len(m.Fields)
 	sqlDefs := make([]string, 0, colNum)
 	sqlDBNames := make([]string, 0, colNum)
@@ -473,8 +476,8 @@ func (m *modelDef) genModelSQL() modelSQLStrings {
 	for n, i := range m.Fields {
 		sqlDefs = append(sqlDefs, fmt.Sprintf("%s %s", i.DBName, i.DBType))
 		sqlDBNames = append(sqlDBNames, i.DBName)
-		sqlPlaceholders = append(sqlPlaceholders, fmt.Sprintf("$%d", placeholderStart+n))
-		sqlPlaceholderTpl = append(sqlPlaceholderTpl, "$%d")
+		sqlPlaceholders = append(sqlPlaceholders, fmt.Sprintf("%s%d", placeholderPrefix, placeholderStart+n))
+		sqlPlaceholderTpl = append(sqlPlaceholderTpl, placeholderPrefix+"%d")
 		sqlPlaceholderCount = append(sqlPlaceholderCount, fmt.Sprintf("n+%d", placeholderStart+n))
 		sqlIdents = append(sqlIdents, fmt.Sprintf("m.%s", i.Ident))
 	}
@@ -517,7 +520,7 @@ func (m *modelDef) genModelSQL() modelSQLStrings {
 	}
 }
 
-func (q *queryGroupDef) genQuerySQL() querySQLStrings {
+func (q *queryGroupDef) genQuerySQL(placeholderPrefix string) querySQLStrings {
 	colNum := len(q.Fields)
 	sqlDBNames := make([]string, 0, colNum)
 	sqlIdents := make([]string, 0, colNum)
@@ -529,7 +532,7 @@ func (q *queryGroupDef) genQuerySQL() querySQLStrings {
 		sqlDBNames = append(sqlDBNames, i.DBName)
 		sqlIdents = append(sqlIdents, fmt.Sprintf("m.%s", i.Ident))
 		sqlIdentRefs = append(sqlIdentRefs, fmt.Sprintf("&m.%s", i.Ident))
-		sqlPlaceholders = append(sqlPlaceholders, fmt.Sprintf("$%d", placeholderStart+n))
+		sqlPlaceholders = append(sqlPlaceholders, fmt.Sprintf("%s%d", placeholderPrefix, placeholderStart+n))
 	}
 
 	return querySQLStrings{
@@ -542,7 +545,7 @@ func (q *queryGroupDef) genQuerySQL() querySQLStrings {
 	}
 }
 
-func (q *queryDef) genQueryCondSQL(offset int) queryCondSQLStrings {
+func (q *queryDef) genQueryCondSQL(placeholderPrefix string, offset int) queryCondSQLStrings {
 	sqlIdentParams := make([]string, 0, len(q.Conds))
 	sqlDBCond := make([]string, 0, len(q.Conds))
 	sqlIdentArgs := make([]string, 0, len(q.Conds))
@@ -580,7 +583,7 @@ func (q *queryDef) genQueryCondSQL(offset int) queryCondSQLStrings {
 			sqlArrIdentArgsLen = append(sqlArrIdentArgsLen, fmt.Sprintf("len(%s)", paramName))
 		} else {
 			paramCount++
-			sqlDBCond = append(sqlDBCond, fmt.Sprintf("%s %s $%d", dbName, condText, paramCount))
+			sqlDBCond = append(sqlDBCond, fmt.Sprintf("%s %s %s%d", dbName, condText, placeholderPrefix, paramCount))
 			sqlIdentArgs = append(sqlIdentArgs, paramName)
 		}
 	}

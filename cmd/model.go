@@ -109,6 +109,7 @@ cond may be one of:
 	modelCmd.PersistentFlags().StringVar(&c.modelFlags.opts.ModelDirective, "model-directive", "forge:model", "comment directive of types that are models")
 	modelCmd.PersistentFlags().StringVar(&c.modelFlags.opts.QueryDirective, "query-directive", "forge:model:query", "comment directive of types that are model queries")
 	modelCmd.PersistentFlags().StringVar(&c.modelFlags.opts.ModelTag, "model-tag", "model", "go struct tag for defining model fields")
+	modelCmd.PersistentFlags().StringVar(&c.modelFlags.opts.PlaceholderPrefix, "placeholder-prefix", "$", "query numeric placeholder prefix")
 	return modelCmd
 }
 
