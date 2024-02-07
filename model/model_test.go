@@ -1410,13 +1410,14 @@ type (
 				Fsys: fstest.MapFS{},
 			}
 			err := Generate(context.Background(), klog.Discard{}, outputfs, tc.Fsys, "dev", Opts{
-				Output:         "model_gen.go",
-				Schema:         "model.json",
-				Include:        "stuff",
-				Ignore:         `_again\.go$`,
-				ModelDirective: "forge:model",
-				QueryDirective: "forge:model:query",
-				ModelTag:       "model",
+				Output:            "model_gen.go",
+				Schema:            "model.json",
+				Include:           "stuff",
+				Ignore:            `_again\.go$`,
+				ModelDirective:    "forge:model",
+				QueryDirective:    "forge:model:query",
+				ModelTag:          "model",
+				PlaceholderPrefix: "$",
 			}, ExecEnv{
 				GoPackage: "somepackage",
 			})
@@ -1453,13 +1454,14 @@ type (
 				Fsys: fstest.MapFS{},
 			}
 			err := Generate(context.Background(), klog.Discard{}, outputfs, fsys, "dev", Opts{
-				Output:         "model_gen.go",
-				Schema:         "model.json",
-				Include:        `\y`,
-				Ignore:         `_again\.go$`,
-				ModelDirective: "forge:model",
-				QueryDirective: "forge:model:query",
-				ModelTag:       "model",
+				Output:            "model_gen.go",
+				Schema:            "model.json",
+				Include:           `\y`,
+				Ignore:            `_again\.go$`,
+				ModelDirective:    "forge:model",
+				QueryDirective:    "forge:model:query",
+				ModelTag:          "model",
+				PlaceholderPrefix: "$",
 			}, ExecEnv{
 				GoPackage: "somepackage",
 			})
@@ -1475,13 +1477,14 @@ type (
 				Fsys: fstest.MapFS{},
 			}
 			err := Generate(context.Background(), klog.Discard{}, outputfs, fsys, "dev", Opts{
-				Output:         "model_gen.go",
-				Schema:         "model.json",
-				Include:        "stuff",
-				Ignore:         `\y`,
-				ModelDirective: "forge:model",
-				QueryDirective: "forge:model:query",
-				ModelTag:       "model",
+				Output:            "model_gen.go",
+				Schema:            "model.json",
+				Include:           "stuff",
+				Ignore:            `\y`,
+				ModelDirective:    "forge:model",
+				QueryDirective:    "forge:model:query",
+				ModelTag:          "model",
+				PlaceholderPrefix: "$",
 			}, ExecEnv{
 				GoPackage: "somepackage",
 			})
@@ -1513,13 +1516,14 @@ type (
 			Fsys: fstest.MapFS{},
 		}
 		err := Generate(context.Background(), klog.Discard{}, outputfs, fsys, "dev", Opts{
-			Output:         "model_gen.go",
-			Schema:         "model.json",
-			Include:        "",
-			Ignore:         "",
-			ModelDirective: "forge:model",
-			QueryDirective: "forge:model:query",
-			ModelTag:       "model",
+			Output:            "model_gen.go",
+			Schema:            "model.json",
+			Include:           "",
+			Ignore:            "",
+			ModelDirective:    "forge:model",
+			QueryDirective:    "forge:model:query",
+			ModelTag:          "model",
+			PlaceholderPrefix: "$",
 		}, ExecEnv{
 			GoPackage: "somepackage",
 		})

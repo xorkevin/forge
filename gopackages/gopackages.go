@@ -8,7 +8,7 @@ import (
 	"io/fs"
 	"path"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 
 	"xorkevin.dev/kerrors"
@@ -212,7 +212,7 @@ func FindDirectives(pkg *ast.Package, sigils []string) []DirectiveObject {
 	for k := range pkg.Files {
 		filenames = append(filenames, k)
 	}
-	sort.Strings(filenames)
+	slices.Sort(filenames)
 	for _, i := range filenames {
 		ast.Walk(visitor, pkg.Files[i])
 	}
