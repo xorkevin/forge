@@ -1400,7 +1400,6 @@ type (
 			Err: ErrInvalidModel,
 		},
 	} {
-		tc := tc
 		t.Run(tc.Name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1565,7 +1564,6 @@ func TestQueryKindString(t *testing.T) {
 			String: "unknown",
 		},
 	} {
-		tc := tc
 		assert.Equal(tc.String, tc.Kind.String())
 	}
 }
@@ -1596,7 +1594,6 @@ func TestError(t *testing.T) {
 			String: "Invalid model",
 		},
 	} {
-		tc := tc
 		assert.Equal(tc.String, tc.Err.Error())
 	}
 }

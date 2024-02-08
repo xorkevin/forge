@@ -280,7 +280,6 @@ type (
 			Err: ErrInvalidFile,
 		},
 	} {
-		tc := tc
 		t.Run(tc.Name, func(t *testing.T) {
 			t.Parallel()
 
@@ -437,7 +436,6 @@ func TestError(t *testing.T) {
 			String: "Invalid validator",
 		},
 	} {
-		tc := tc
 		assert.Equal(tc.String, tc.Err.Error())
 	}
 }

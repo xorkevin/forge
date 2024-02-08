@@ -133,8 +133,6 @@ func TestReadDir(t *testing.T) {
 			Err: ErrorConflictingPackage{},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.Name, func(t *testing.T) {
 			t.Parallel()
 
@@ -313,8 +311,6 @@ var (
 			Name: "",
 		},
 	} {
-		tc := tc
-
 		assert.Equal(tc.Directives, dirs[n].Directives)
 		assert.Equal(tc.Kind, dirs[n].Kind)
 		switch tc.Kind {

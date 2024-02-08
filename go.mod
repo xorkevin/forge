@@ -1,8 +1,6 @@
 module xorkevin.dev/forge
 
-go 1.21
-
-toolchain go1.21.0
+go 1.22.0
 
 require (
 	github.com/spf13/cobra v1.7.0
